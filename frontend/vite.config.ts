@@ -6,6 +6,13 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 const API_TARGET = process.env.VITE_API_PROXY ?? 'http://127.0.0.1:4000';
 
+/** Same wiring for `vite dev` and `vite preview`: the API is same-origin. */
+const proxy = {
+  '/api': { target: API_TARGET, changeOrigin: true },
+  '/metrics': { target: API_TARGET, changeOrigin: true },
+  '/realtime': { target: API_TARGET, ws: true, changeOrigin: true },
+};
+
 export default defineConfig({
   plugins: [
     react(),
@@ -78,13 +85,9 @@ export default defineConfig({
     strictPort: true,
     // Preview/dev hosts are proxied, so accept any Host header.
     allowedHosts: true,
-    proxy: {
-      '/api': { target: API_TARGET, changeOrigin: true },
-      '/metrics': { target: API_TARGET, changeOrigin: true },
-      '/realtime': { target: API_TARGET, ws: true, changeOrigin: true },
-    },
+    proxy,
   },
-  preview: { host: true, port: 4173, allowedHosts: true },
+  preview: { host: true, port: 4173, allowedHosts: true, proxy },
   build: {
     target: 'es2022',
     sourcemap: true,

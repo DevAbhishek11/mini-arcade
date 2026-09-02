@@ -92,13 +92,32 @@ export interface MatchHistoryItem {
   endedAt: string | null;
 }
 
+export interface AuthResponse {
+  token: string;
+  expiresIn: number;
+  player: PlayerPublic;
+}
+
+export interface RegisterInput {
+  nickname: string;
+  email: string;
+  password: string;
+}
+
 export const api = {
   createGuest: (nickname?: string) =>
-    request<{ token: string; expiresIn: number; player: PlayerPublic }>('/auth/guest', {
+    request<AuthResponse>('/auth/guest', {
       method: 'POST',
       auth: false,
       body: nickname ? { nickname } : {},
     }),
+  register: (input: RegisterInput) =>
+    request<AuthResponse>('/auth/register', { method: 'POST', auth: false, body: input }),
+  login: (identifier: string, password: string) =>
+    request<AuthResponse>('/auth/login', { method: 'POST', auth: false, body: { identifier, password } }),
+  /** Adds credentials to the signed-in guest, keeping its id and progress. */
+  upgradeAccount: (input: RegisterInput) =>
+    request<AuthResponse>('/auth/upgrade', { method: 'POST', body: input }),
   me: () => request<{ player: PlayerPublic }>('/auth/me'),
   rename: (nickname: string) =>
     request<{ player: PlayerPublic }>('/players/me', { method: 'PATCH', body: { nickname } }),

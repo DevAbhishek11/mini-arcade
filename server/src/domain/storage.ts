@@ -10,6 +10,18 @@ export interface PlayerRecord {
   draws: number;
   createdAt: Date;
   lastSeenAt: Date;
+  /** A guest has no credentials — its signed token is the whole identity. */
+  isGuest: boolean;
+  email: string | null;
+  passwordHash: string | null;
+}
+
+/** Everything needed to turn a nickname into a credentialed account. */
+export interface AccountInput {
+  nickname: string;
+  avatar: string;
+  email: string;
+  passwordHash: string;
 }
 
 export interface MatchRecord {
@@ -49,8 +61,12 @@ export interface Storage {
   readonly kind: 'postgres' | 'memory';
   init(): Promise<void>;
   createGuest(nickname: string, avatar: string): Promise<PlayerRecord>;
+  createAccount(input: AccountInput): Promise<PlayerRecord>;
+  /** Promotes an existing guest in place, keeping its id, rating and history. */
+  upgradeGuest(id: string, input: Omit<AccountInput, 'avatar'>): Promise<PlayerRecord | null>;
   findPlayerById(id: string): Promise<PlayerRecord | null>;
   findPlayerByNickname(nickname: string): Promise<PlayerRecord | null>;
+  findPlayerByEmail(email: string): Promise<PlayerRecord | null>;
   touchPlayer(id: string): Promise<void>;
   renamePlayer(id: string, nickname: string): Promise<PlayerRecord | null>;
   createMatch(match: { id: string; gameId: GameId; playerIds: string[] }): Promise<void>;
@@ -79,6 +95,7 @@ export function toPublicPlayer(record: PlayerRecord): PlayerPublic {
     losses: record.losses,
     draws: record.draws,
     createdAt: record.createdAt.toISOString(),
+    isGuest: record.isGuest,
   };
 }
 

@@ -257,7 +257,7 @@ handy for demos, useless for persistence.
 ## 9. Testing, linting and type checking
 
 ```bash
-npm test              # every workspace: 108 tests
+npm test              # every workspace: 141 tests
 npm run test:server   # server + shared engines, AI, progression, rooms, cache, API
 npm run test:web      # browser-env tests: offline match runner, solo stats, session
 npm run typecheck     # tsc --noEmit everywhere
@@ -303,6 +303,18 @@ curl localhost:4000/api/system/runtime
 curl localhost:4000/metrics | head
 ```
 
+**Accounts**
+
+```bash
+# register
+curl -s -X POST localhost:4000/api/auth/register -H 'content-type: application/json' \
+  -d '{"nickname":"neon_fox","email":"neon@example.com","password":"arcade2026"}'
+
+# log in with the email or the nickname
+curl -s -X POST localhost:4000/api/auth/login -H 'content-type: application/json' \
+  -d '{"identifier":"neon_fox","password":"arcade2026"}'
+```
+
 **A guest session and a game list**
 
 ```bash
@@ -319,6 +331,7 @@ curl -s "localhost:4000/api/leaderboard?game=all&limit=5"
 **A real match, end to end** — open http://localhost:5173 in two browser
 windows (use one private window so you get two guest identities):
 
+0. Sign up, or press **Play as guest** on the welcome screen.
 1. Both open the same cabinet and press **Find a match** → you get paired.
 2. Or: one presses **Friend → Create room**, copies the code, the other pastes
    it into the lobby box.

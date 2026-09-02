@@ -4,8 +4,10 @@ import { config } from '../../config/env.js';
 import { runMigrations } from '../../infra/db/migrate.js';
 import { pingDatabase, query, transaction } from '../../infra/db/pool.js';
 import { createLogger } from '../../infra/logger.js';
+import { emailKey } from '../../utils/password.js';
 import {
   nicknameKey,
+  type AccountInput,
   type LeaderboardQuery,
   type MatchHistoryItem,
   type PlayerRecord,
@@ -24,6 +26,9 @@ interface PlayerRow {
   draws: number;
   created_at: Date;
   last_seen_at: Date;
+  is_guest: boolean;
+  email: string | null;
+  password_hash: string | null;
 }
 
 const mapPlayer = (row: PlayerRow): PlayerRecord => ({
@@ -36,7 +41,20 @@ const mapPlayer = (row: PlayerRow): PlayerRecord => ({
   draws: Number(row.draws),
   createdAt: row.created_at,
   lastSeenAt: row.last_seen_at,
+  isGuest: row.is_guest ?? true,
+  email: row.email ?? null,
+  passwordHash: row.password_hash ?? null,
 });
+
+/** Postgres unique violation, mapped to a caller-friendly code. */
+function mapUniqueViolation(error: unknown): never {
+  if ((error as { code?: string }).code === '23505') {
+    const detail = String((error as { constraint?: string }).constraint ?? '');
+    const code = detail.includes('email') ? 'EMAIL_TAKEN' : 'NICKNAME_TAKEN';
+    throw Object.assign(new Error(code.toLowerCase().replace('_', ' ')), { code });
+  }
+  throw error;
+}
 
 export class PostgresStorage implements Storage {
   readonly kind = 'postgres' as const;
@@ -56,6 +74,61 @@ export class PostgresStorage implements Storage {
       [id, nickname, nicknameKey(nickname), avatar],
     );
     return mapPlayer(rows[0] as PlayerRow);
+  }
+
+  async createAccount(input: AccountInput): Promise<PlayerRecord> {
+    const id = randomUUID();
+    try {
+      const { rows } = await query<PlayerRow>(
+        'players.insertAccount',
+        `INSERT INTO players (id, nickname, nickname_key, avatar, email, email_key, password_hash, is_guest)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE)
+         RETURNING *`,
+        [
+          id,
+          input.nickname,
+          nicknameKey(input.nickname),
+          input.avatar,
+          input.email,
+          emailKey(input.email),
+          input.passwordHash,
+        ],
+      );
+      return mapPlayer(rows[0] as PlayerRow);
+    } catch (error) {
+      mapUniqueViolation(error);
+    }
+  }
+
+  async upgradeGuest(id: string, input: Omit<AccountInput, 'avatar'>): Promise<PlayerRecord | null> {
+    try {
+      const { rows } = await query<PlayerRow>(
+        'players.upgradeGuest',
+        `UPDATE players
+            SET nickname = $2, nickname_key = $3, email = $4, email_key = $5,
+                password_hash = $6, is_guest = FALSE
+          WHERE id = $1 AND is_guest = TRUE
+          RETURNING *`,
+        [
+          id,
+          input.nickname,
+          nicknameKey(input.nickname),
+          input.email,
+          emailKey(input.email),
+          input.passwordHash,
+        ],
+      );
+      return rows[0] ? mapPlayer(rows[0]) : null;
+    } catch (error) {
+      mapUniqueViolation(error);
+    }
+  }
+
+  async findPlayerByEmail(email: string): Promise<PlayerRecord | null> {
+    const { rows } = await query<PlayerRow>('players.byEmail', 'SELECT * FROM players WHERE email_key = $1', [
+      emailKey(email),
+    ]);
+    return rows[0] ? mapPlayer(rows[0]) : null;
   }
 
   async findPlayerById(id: string): Promise<PlayerRecord | null> {

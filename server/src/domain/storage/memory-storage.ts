@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { LeaderboardEntry } from '@mini-arcade/shared';
 import { DEFAULT_RATING, GAME_IDS } from '@mini-arcade/shared';
 import { createLogger } from '../../infra/logger.js';
+import { emailKey } from '../../utils/password.js';
 import {
   nicknameKey,
+  type AccountInput,
   type LeaderboardQuery,
   type MatchHistoryItem,
   type MatchRecord,
@@ -35,6 +37,7 @@ export class MemoryStorage implements Storage {
 
   private readonly players = new Map<string, PlayerRecord>();
   private readonly byNickname = new Map<string, string>();
+  private readonly byEmail = new Map<string, string>();
   private readonly gameStats = new Map<string, Map<string, GameStats>>();
   private readonly matches = new Map<string, MemMatch>();
   private readonly matchOrder: string[] = [];
@@ -70,11 +73,58 @@ export class MemoryStorage implements Storage {
       draws: 0,
       createdAt: now,
       lastSeenAt: now,
+      isGuest: true,
+      email: null,
+      passwordHash: null,
     };
     this.players.set(record.id, record);
     this.byNickname.set(nicknameKey(nickname), record.id);
     for (const gameId of GAME_IDS) this.statsFor(record.id, gameId);
     return record;
+  }
+
+  async createAccount(input: AccountInput): Promise<PlayerRecord> {
+    const key = emailKey(input.email);
+    if (this.byEmail.has(key)) throw Object.assign(new Error('email taken'), { code: 'EMAIL_TAKEN' });
+    if (this.byNickname.has(nicknameKey(input.nickname))) {
+      throw Object.assign(new Error('nickname taken'), { code: 'NICKNAME_TAKEN' });
+    }
+
+    const record = await this.createGuest(input.nickname, input.avatar);
+    record.isGuest = false;
+    record.email = input.email;
+    record.passwordHash = input.passwordHash;
+    this.byEmail.set(key, record.id);
+    return record;
+  }
+
+  async upgradeGuest(id: string, input: Omit<AccountInput, 'avatar'>): Promise<PlayerRecord | null> {
+    const player = this.players.get(id);
+    if (!player) return null;
+
+    const key = emailKey(input.email);
+    const emailOwner = this.byEmail.get(key);
+    if (emailOwner && emailOwner !== id) throw Object.assign(new Error('email taken'), { code: 'EMAIL_TAKEN' });
+
+    const nickKey = nicknameKey(input.nickname);
+    const nickOwner = this.byNickname.get(nickKey);
+    if (nickOwner && nickOwner !== id)
+      throw Object.assign(new Error('nickname taken'), { code: 'NICKNAME_TAKEN' });
+
+    this.byNickname.delete(nicknameKey(player.nickname));
+    this.byNickname.set(nickKey, id);
+    this.byEmail.set(key, id);
+
+    player.nickname = input.nickname;
+    player.email = input.email;
+    player.passwordHash = input.passwordHash;
+    player.isGuest = false;
+    return player;
+  }
+
+  async findPlayerByEmail(email: string): Promise<PlayerRecord | null> {
+    const id = this.byEmail.get(emailKey(email));
+    return id ? (this.players.get(id) ?? null) : null;
   }
 
   async findPlayerById(id: string): Promise<PlayerRecord | null> {

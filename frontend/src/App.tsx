@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect, type ReactElement } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { UpdatePrompt } from '@/components/pwa/UpdatePrompt';
 import { Toaster } from '@/components/ui/Toaster';
 import { AchievementsPage } from '@/pages/AchievementsPage';
+import { AuthPage } from '@/pages/AuthPage';
 import { LeaderboardPage } from '@/pages/LeaderboardPage';
 import { LobbyPage } from '@/pages/LobbyPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -12,6 +13,7 @@ import { PlayPage } from '@/pages/PlayPage';
 import { SoloPage } from '@/pages/SoloPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SystemPage } from '@/pages/SystemPage';
+import { WelcomePage } from '@/pages/WelcomePage';
 import { useArcade } from '@/store/arcade';
 import { useProgression } from '@/store/progression';
 import { useSession } from '@/store/session';
@@ -42,6 +44,28 @@ function BootScreen({ error }: { error: string | null }) {
   );
 }
 
+/**
+ * Online play needs an identity (guest or account). Anonymous visitors are
+ * sent to the login screen and returned to wherever they were headed.
+ */
+function RequireSession({ children }: { children: ReactElement }) {
+  const status = useSession((s) => s.status);
+  const location = useLocation();
+
+  if (status === 'ready') return children;
+  return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+}
+
+/** Signed-in players never need to see the welcome or auth screens again. */
+function RedirectIfSignedIn({ children }: { children: ReactElement }) {
+  const status = useSession((s) => s.status);
+  const location = useLocation();
+  const next = new URLSearchParams(location.search).get('next');
+
+  if (status === 'ready') return <Navigate to={next && next.startsWith('/') ? next : '/'} replace />;
+  return children;
+}
+
 export default function App() {
   const { status, error, bootstrap } = useSession();
   const listen = useArcade((s) => s.listen);
@@ -49,31 +73,87 @@ export default function App() {
   const subscribeProgress = useProgression((s) => s.subscribe);
 
   useEffect(() => {
-    void bootstrap().then(() => {
-      listen();
-      subscribeProgress();
-      void loadProgress();
-    });
-  }, [bootstrap, listen, loadProgress, subscribeProgress]);
+    void bootstrap();
+  }, [bootstrap]);
 
-  if (status !== 'ready') return <BootScreen error={status === 'error' ? error : null} />;
+  // Realtime plumbing only makes sense once somebody is signed in.
+  useEffect(() => {
+    if (status !== 'ready') return;
+    listen();
+    subscribeProgress();
+    void loadProgress();
+  }, [status, listen, loadProgress, subscribeProgress]);
+
+  if (status === 'loading' || status === 'error') {
+    return <BootScreen error={status === 'error' ? error : null} />;
+  }
 
   return (
-    <AppShell>
+    <>
       <Routes>
-        <Route path="/" element={<LobbyPage />} />
-        <Route path="/play/:gameId" element={<PlayPage />} />
-        <Route path="/solo/:gameId" element={<SoloPage />} />
-        <Route path="/leaderboard" element={<LeaderboardPage />} />
-        <Route path="/achievements" element={<AchievementsPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/system" element={<SystemPage />} />
-        <Route path="/play" element={<Navigate to="/" replace />} />
-        <Route path="/solo" element={<Navigate to="/solo/tic-tac-toe" replace />} />
-        <Route path="*" element={<NotFoundPage />} />
+        {/* Full-bleed pages without the app chrome. */}
+        <Route
+          path="/login"
+          element={
+            <RedirectIfSignedIn>
+              <AuthPage mode="login" />
+            </RedirectIfSignedIn>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <RedirectIfSignedIn>
+              <AuthPage mode="signup" />
+            </RedirectIfSignedIn>
+          }
+        />
+
+        <Route
+          path="*"
+          element={
+            <AppShell>
+              <Routes>
+                {/* Signed in players land straight in the arcade; visitors get the pitch. */}
+                <Route path="/" element={status === 'ready' ? <LobbyPage /> : <WelcomePage />} />
+                <Route
+                  path="/play/:gameId"
+                  element={
+                    <RequireSession>
+                      <PlayPage />
+                    </RequireSession>
+                  }
+                />
+                {/* Solo runs entirely in the browser — no identity required. */}
+                <Route path="/solo/:gameId" element={<SoloPage />} />
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
+                <Route
+                  path="/achievements"
+                  element={
+                    <RequireSession>
+                      <AchievementsPage />
+                    </RequireSession>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <RequireSession>
+                      <ProfilePage />
+                    </RequireSession>
+                  }
+                />
+                <Route path="/system" element={<SystemPage />} />
+                <Route path="/play" element={<Navigate to="/" replace />} />
+                <Route path="/solo" element={<Navigate to="/solo/tic-tac-toe" replace />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </AppShell>
+          }
+        />
       </Routes>
       <Toaster />
       <UpdatePrompt />
-    </AppShell>
+    </>
   );
 }

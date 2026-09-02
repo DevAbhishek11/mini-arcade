@@ -23,6 +23,7 @@ nginx  ──sticky──▶  api replicas  ──▶  Postgres (durable state)
 - [What's in the box](#whats-in-the-box)
 - [The games](#the-games)
 - [Progression & engagement](#progression--engagement)
+- [Accounts and guests](#accounts-and-guests)
 - [Solo, offline and installable](#solo-offline-and-installable)
 - [Quick start](#quick-start)
 - [Architecture](#architecture)
@@ -94,6 +95,26 @@ The retention loop is deliberately non-coercive — nothing is paywalled, nothin
   never wasted time.
 
 Everything a match earned is summarised in the result overlay and pushed live over `progress:update`.
+
+---
+
+## Accounts and guests
+
+Three ways in, and nobody is forced to register before they can play:
+
+| Route                     | What happens                                                                                                                                             |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/register` | Nickname + email + password. Passwords are hashed with **scrypt** (16384/8/1, 16-byte salt, 64-byte key) using Node's own crypto — no native dependency. |
+| `POST /api/auth/login`    | Accepts an email **or** a nickname. Wrong password and unknown account return the identical 401, so the endpoint cannot be used to enumerate players.    |
+| `POST /api/auth/guest`    | Instant throwaway identity. Guests can play everything.                                                                                                  |
+| `POST /api/auth/upgrade`  | Turns the signed-in guest into a full account **in place** — same player id, so rating, match history, XP, streak and achievements all carry over.       |
+
+Both credential endpoints sit behind the distributed auth rate limiter. A hash
+never leaves the database layer: `PlayerPublic` only carries an `isGuest` flag.
+
+In the web app, a signed-out visitor gets a landing page with a playable board;
+signing in drops you straight into the arcade, and protected routes bounce to
+`/login?next=…` and return you afterwards. Solo play needs no account at all.
 
 ---
 
@@ -358,7 +379,7 @@ frontend/
 ```bash
 npm run lint        # eslint (typescript-eslint, flat config)
 npm run typecheck   # tsc --noEmit across all workspaces
-npm test            # vitest — 108 tests across server and web
+npm test            # vitest — 141 tests across server and web
 npm run build       # shared → server → frontend
 ```
 

@@ -24,7 +24,8 @@ export class TokenBucketLimiter {
   constructor(private readonly options: TokenBucketOptions) {
     this.buckets = new LRUCache<string, Bucket>({
       max: options.maxKeys ?? 10_000,
-      ttl: Math.max(60_000, (options.burst / options.ratePerSecond) * 4_000),
+      // lru-cache demands a positive integer, and burst/rate is rarely whole.
+      ttl: Math.ceil(Math.max(60_000, (options.burst / options.ratePerSecond) * 4_000)),
     });
   }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { GAME_CATALOG, isGameId } from '@mini-arcade/shared';
+import { UpgradeAccountCard } from '@/components/UpgradeAccountCard';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -55,10 +56,12 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-6">
+      <UpgradeAccountCard />
+
       <Card className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
         <Avatar nickname={player.nickname} avatar={player.avatar} size="lg" ring />
         <div className="flex-1">
-          <CardLabel>guest player</CardLabel>
+          <CardLabel>{player.isGuest ? 'guest player' : 'registered player'}</CardLabel>
           <h1 className="mt-1 text-3xl font-bold">{player.nickname}</h1>
           <p className="mt-1 text-sm text-slate-500">
             Member since {new Date(player.createdAt).toLocaleDateString()}

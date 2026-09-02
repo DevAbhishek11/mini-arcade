@@ -188,6 +188,8 @@ export interface PlayerPublic {
   losses: number;
   draws: number;
   createdAt: string;
+  /** True until the player registers; guests can play but are not durable. */
+  isGuest: boolean;
 }
 
 export interface PlayerSlot {

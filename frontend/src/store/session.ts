@@ -5,9 +5,19 @@ import { connectSocket, disconnectSocket, getSocket } from '@/lib/socket';
 
 export type ConnectionState = 'idle' | 'connecting' | 'online' | 'offline';
 
+export interface Credentials {
+  nickname: string;
+  email: string;
+  password: string;
+}
+
 interface SessionState {
   player: PlayerPublic | null;
-  status: 'loading' | 'ready' | 'error';
+  /**
+   * `anonymous` is a fully booted app with nobody signed in — the visitor sees
+   * the welcome screen and can log in, register or play as a guest.
+   */
+  status: 'loading' | 'anonymous' | 'ready' | 'error';
   /** `offline` means the API was unreachable — solo play still works. */
   mode: 'online' | 'offline';
   connection: ConnectionState;
@@ -15,7 +25,12 @@ interface SessionState {
   latencyMs: number | null;
   error: string | null;
   bootstrap: () => Promise<void>;
-  signIn: (nickname?: string) => Promise<void>;
+  /** Creates a throwaway identity that can play immediately. */
+  playAsGuest: (nickname?: string) => Promise<void>;
+  logIn: (identifier: string, password: string) => Promise<void>;
+  register: (input: Credentials) => Promise<void>;
+  /** Registers while keeping the current guest's rating, history and XP. */
+  upgradeGuest: (input: Credentials) => Promise<void>;
   rename: (nickname: string) => Promise<void>;
   signOut: () => void;
   setPlayer: (player: PlayerPublic) => void;
@@ -24,6 +39,9 @@ interface SessionState {
 const isNetworkFailure = (error: unknown): boolean =>
   error instanceof ApiRequestError &&
   (error.status === 0 || error.code === 'NETWORK' || error.code === 'TIMEOUT');
+
+/** True once somebody — guest or registered — can actually play. */
+export const isSignedIn = (state: { status: SessionState['status'] }): boolean => state.status === 'ready';
 
 export const useSession = create<SessionState>((set, get) => ({
   player: null,
@@ -35,23 +53,22 @@ export const useSession = create<SessionState>((set, get) => ({
   error: null,
 
   async bootstrap() {
+    // No stored token: stay anonymous and let the visitor choose. We no longer
+    // mint a guest automatically, so accounts are a real first-class choice.
+    if (!tokenStore.get()) {
+      set({ player: null, status: 'anonymous', mode: 'online', error: null });
+      return;
+    }
+
     try {
-      if (tokenStore.get()) {
-        const { player } = await api.me();
-        set({ player, status: 'ready', mode: 'online', error: null });
-      } else {
-        const { token, player } = await api.createGuest();
-        tokenStore.set(token);
-        set({ player, status: 'ready', mode: 'online', error: null });
-      }
+      const { player } = await api.me();
+      set({ player, status: 'ready', mode: 'online', error: null });
       wireSocket(set, get);
     } catch (error) {
+      // Expired or revoked session — back to the welcome screen.
       if (error instanceof ApiRequestError && error.status === 401) {
         tokenStore.clear();
-        const { token, player } = await api.createGuest();
-        tokenStore.set(token);
-        set({ player, status: 'ready', mode: 'online', error: null });
-        wireSocket(set, get);
+        set({ player: null, status: 'anonymous', error: null });
         return;
       }
 
@@ -67,13 +84,25 @@ export const useSession = create<SessionState>((set, get) => ({
     }
   },
 
-  async signIn(nickname) {
-    set({ status: 'loading' });
+  async playAsGuest(nickname) {
     const { token, player } = await api.createGuest(nickname);
+    adoptSession(set, get, token, player);
+  },
+
+  async logIn(identifier, password) {
+    const { token, player } = await api.login(identifier, password);
+    adoptSession(set, get, token, player);
+  },
+
+  async register(input) {
+    const { token, player } = await api.register(input);
+    adoptSession(set, get, token, player);
+  },
+
+  async upgradeGuest(input) {
+    const { token, player } = await api.upgradeAccount(input);
     tokenStore.set(token);
-    disconnectSocket();
-    set({ player, status: 'ready' });
-    wireSocket(set, get);
+    set({ player, status: 'ready', mode: 'online', error: null });
   },
 
   async rename(nickname) {
@@ -84,8 +113,8 @@ export const useSession = create<SessionState>((set, get) => ({
   signOut() {
     tokenStore.clear();
     disconnectSocket();
-    set({ player: null, status: 'loading', connection: 'idle' });
-    void get().bootstrap();
+    resetSocketWiring();
+    set({ player: null, status: 'anonymous', connection: 'idle', workerId: null, latencyMs: null });
   },
 
   setPlayer(player) {
@@ -93,10 +122,30 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 }));
 
+type SetState = (partial: Partial<SessionState>) => void;
+type GetState = () => SessionState;
+
+/** Shared tail of every sign-in path: store the token, connect, go. */
+function adoptSession(set: SetState, get: GetState, token: string, player: PlayerPublic): void {
+  tokenStore.set(token);
+  disconnectSocket();
+  resetSocketWiring();
+  set({ player, status: 'ready', mode: 'online', error: null });
+  wireSocket(set, get);
+}
+
 let wired = false;
 let pingTimer: number | null = null;
 
-function wireSocket(set: (partial: Partial<SessionState>) => void, get: () => SessionState): void {
+function resetSocketWiring(): void {
+  wired = false;
+  if (pingTimer) {
+    window.clearInterval(pingTimer);
+    pingTimer = null;
+  }
+}
+
+function wireSocket(set: SetState, get: GetState): void {
   const socket = connectSocket();
   if (wired) return;
   wired = true;
@@ -114,7 +163,6 @@ function wireSocket(set: (partial: Partial<SessionState>) => void, get: () => Se
 
   socket.on('pong', ({ clientTime }) => set({ latencyMs: Date.now() - clientTime }));
 
-  if (pingTimer) window.clearInterval(pingTimer);
   pingTimer = window.setInterval(() => {
     if (getSocket().connected) getSocket().emit('ping', { clientTime: Date.now() });
   }, 5_000);
