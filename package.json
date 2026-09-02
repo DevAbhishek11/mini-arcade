@@ -1,0 +1,40 @@
+{
+  "name": "mini-arcade",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mini Arcade \u2014 realtime multiplayer arcade platform (TypeScript monorepo)",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "workspaces": [
+    "packages/shared",
+    "server",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:server": "npm run dev -w @mini-arcade/server",
+    "dev:web": "npm run dev -w @mini-arcade/frontend",
+    "build": "npm run build -w @mini-arcade/shared && npm run build -w @mini-arcade/server && npm run build -w @mini-arcade/frontend",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
+    "test": "npm run test --workspaces --if-present",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down -v",
+    "docker:logs": "docker compose logs -f",
+    "test:server": "npm run test -w @mini-arcade/server",
+    "test:web": "npm run test -w @mini-arcade/frontend"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.15.0"
+  }
+}
