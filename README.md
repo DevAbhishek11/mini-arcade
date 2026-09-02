@@ -1,8 +1,9 @@
 # Mini Arcade
 
-A realtime, multiplayer arcade built as a production-shaped TypeScript monorepo. Players are matched by
-rating in seconds and play **server-authoritative** games over websockets — the browser only renders and
-predicts, the server decides.
+A realtime, multiplayer arcade built as a production-shaped TypeScript monorepo. **Seven games**, matchmaking
+by rating in seconds, private rooms for friends, bots with three difficulties, and a full progression layer
+(XP, levels, daily streaks, quests and achievements). Every game is **server-authoritative** over websockets —
+the browser only renders and predicts, the server decides.
 
 ```
 frontend (React 19 + Vite + Tailwind v4)
@@ -17,6 +18,8 @@ nginx  ──sticky──▶  api replicas  ──▶  Postgres (durable state)
 ## Contents
 
 - [What's in the box](#whats-in-the-box)
+- [The games](#the-games)
+- [Progression & engagement](#progression--engagement)
 - [Quick start](#quick-start)
 - [Architecture](#architecture)
 - [Clustering & scaling](#clustering--scaling)
@@ -35,7 +38,10 @@ nginx  ──sticky──▶  api replicas  ──▶  Postgres (durable state)
 
 | Area          | Highlights                                                                                   |
 | ------------- | -------------------------------------------------------------------------------------------- |
-| Games         | Tic Tac Toe, Connect Four (turn based), Neon Pong (30 Hz server simulation)                    |
+| Games         | 7 cabinets: Tic Tac Toe, Connect Four, Gomoku, Reversi, Dots & Boxes, Neon Pong, Snake Duel    |
+| Play modes    | Ranked quick match, unrated practice vs bots (3 difficulties), private rooms with a 5-char code |
+| Progression   | XP & levels, daily streaks, 3 rotating daily quests, 12 achievements, per-match reward summary  |
+| Social        | Per-match chat, 8 emotes with sound, one-tap rematch with swapped seats, shareable invite links |
 | Fairness      | Elo with a dynamic K factor, rating-aware matchmaking that widens with wait time, turn clocks   |
 | Realtime      | socket.io with acks, reconnect grace, presence, per-match chat, cross-worker command routing   |
 | Scaling       | Node `cluster` + sticky sessions, Redis socket.io adapter, distributed lock for matchmaking     |
@@ -43,10 +49,46 @@ nginx  ──sticky──▶  api replicas  ──▶  Postgres (durable state)
 | Data          | Postgres with advisory-locked migrations and pooled queries; in-memory driver as a fallback    |
 | Hardening     | zod-validated env & requests, helmet, CORS, distributed rate limits, request timeouts          |
 | Ops           | `/api/system` health, `/api/system/ready` readiness, Prometheus `/metrics`, structured logs    |
-| Solo play     | If nobody is queued, a bot opponent joins so the cabinet is never idle                          |
+| Solo play     | If nobody is queued, a bot opponent joins — its strength is matched to your rating              |
 
-Three engines, one implementation: every game is a pure, immutable reducer in `@mini-arcade/shared`, so the
-server validates with the exact code the browser renders with.
+Seven engines, one implementation each: every game is a pure, immutable reducer in `@mini-arcade/shared`, so
+the server validates with the exact code the browser renders with.
+
+---
+
+## The games
+
+| Game            | Mode       | Board            | Notes                                                        |
+| --------------- | ---------- | ---------------- | ------------------------------------------------------------ |
+| Tic Tac Toe     | turn based | 3×3              | The classic warm-up, ~1 minute a match                        |
+| Connect Four    | turn based | 7×6              | Gravity drops, four in a row                                  |
+| Gomoku          | turn based | 15×15            | Five in a row, winning line highlighted                       |
+| Reversi         | turn based | 8×8              | Legal moves computed by the engine, automatic pass detection  |
+| Dots & Boxes    | turn based | 5×5 boxes        | Closing a box scores **and** grants another move              |
+| Neon Pong       | realtime   | 30 Hz simulation | Client-side extrapolation between packets                     |
+| Snake Duel      | realtime   | 21×21, 120 ms    | Deterministic LCG food spawns so every client agrees          |
+
+Each cabinet ships with a *how to play* sheet, a difficulty rating and an expected match length, and the
+lobby can be filtered by mode or by "under 3 minutes".
+
+---
+
+## Progression & engagement
+
+The retention loop is deliberately non-coercive — nothing is paywalled, nothing expires punitively.
+
+- **XP & levels** — `xpForLevel(l) = 80 + round(l·45 + l^1.6·12)`, a gentle curve with no grind walls.
+  Playing pays 12 XP, a win 30, a draw 16, a dominant win +15, your first win of the day +25.
+- **Daily streak** — +5 XP per match per streak day, capped at +50. Streaks are the strongest retention
+  lever there is, so the flame lives in the header on every page.
+- **Daily quests** — three quests picked deterministically from a per-player, per-day FNV hash (no storage
+  needed to decide them), each worth 60–110 XP. They reroll at midnight UTC.
+- **Achievements** — 12 permanent badges across bronze/silver/gold: First Blood, Hat Trick, Unstoppable,
+  Giant Slayer, Polyglot, Night Owl, Comeback Kid, Perfectionist, Week Warrior and more.
+- **Practice earns 40%** of the XP of a ranked match and still advances quests, so learning a new game is
+  never wasted time.
+
+Everything a match earned is summarised in the result overlay and pushed live over `progress:update`.
 
 ---
 
@@ -159,6 +201,9 @@ get(key) ─▶ L1 LRU (per process, 5 s TTL) ──hit──▶ value
   cannot stampede the database.
 - **Invalidation** — `cache.invalidate('lb:')` deletes by prefix using `SCAN` (never `KEYS`) and publishes to
   an invalidation channel so every worker drops its L1 at the same instant.
+- **Stale-while-revalidate** — `cache.wrap(key, { staleWhileRevalidateMs })` serves the stale value instantly
+  and refreshes in the background (the leaderboard uses a 30 s SWR window), so a hot page never waits on the
+  database.
 - **Bounded** — L1 is an LRU capped at `CACHE_L1_MAX_ITEMS`; Redis runs `allkeys-lru` with a memory ceiling.
 - Match completion invalidates the affected players, the leaderboards and the global stats in one call.
 
@@ -208,7 +253,11 @@ The **System** page in the UI renders all of this live.
 | `GET`   | `/api/players/:id`          | –    | Public profile                           |
 | `GET`   | `/api/players/:id/matches`  | –    | Recent matches (`?limit=1..50`)          |
 | `GET`   | `/api/games`                | –    | Game catalog                             |
-| `GET`   | `/api/leaderboard`          | –    | `?game=all\|<id>&limit&offset`           |
+| `GET`   | `/api/leaderboard`          | –    | `?game=all\|<id>&limit&offset` (30 s SWR) |
+| `GET`   | `/api/progress/me`          | ✔    | XP, level, streaks, quests, achievements |
+| `GET`   | `/api/progress/catalog`     | –    | All achievement and quest definitions    |
+| `GET`   | `/api/progress/quests/today`| ✔    | Today's rolled quests + your progress    |
+| `GET`   | `/api/progress/:id`         | –    | Public progression for any player        |
 | `GET`   | `/api/system[/live\|/ready\|/runtime\|/stats]` | – | Ops endpoints        |
 | `GET`   | `/metrics`                  | –    | Prometheus exposition                    |
 
@@ -221,10 +270,16 @@ Errors are always `{ "error": { "code", "message", "details?", "requestId" } }`.
 Path `/realtime`, JWT passed in the socket handshake `auth.token`.
 
 **Client → server:** `queue:join`, `queue:leave`, `match:action`, `match:resume`, `match:forfeit`,
-`match:chat`, `ping` — all acknowledged with `{ ok, code?, message? }`.
+`match:chat`, `match:emote`, `match:rematch`, `practice:start`, `room:create`, `room:join`, `room:leave`,
+`room:ready`, `room:start`, `progress:get`, `ping` — all acknowledged with `{ ok, code?, message? }`.
 
-**Server → client:** `session:ready`, `queue:status`, `match:found`, `match:state`, `match:presence`,
-`match:over`, `match:chat`, `stats:update`, `error:notice`, `pong`.
+**Server → client:** `session:ready`, `queue:status`, `queue:left`, `match:found`, `match:state`,
+`match:patch`, `match:presence`, `match:over`, `match:chat`, `match:emote`, `match:rematch:offer`,
+`room:update`, `room:closed`, `progress:update`, `stats:update`, `error:notice`, `pong`.
+
+Private rooms live in Redis when it is configured (so any container can serve a join) and fall back to a
+per-node map otherwise. They expire after 30 minutes, promote a new host if the host leaves, and are capped
+per node. Rematch votes are collected from both players and start a new match with **swapped seats**.
 
 Snapshots carry a monotonic `sequence` and `serverTime`; the client drops out-of-order packets and
 extrapolates Pong between them for smooth rendering at display refresh rate. Actions are token-bucket limited
@@ -261,15 +316,16 @@ server/
     domain/          # services + storage drivers (postgres | memory)
     http/            # express app, middleware, routes
     infra/           # logger, lifecycle, metrics, redis, db pool, migrations, cache
-    realtime/        # gateway, matchmaking, match runtime, bots, bus, presence
+    realtime/        # gateway + handlers/ (queue, match, rooms, limits), matchmaking,
+                     #   match runtime, room manager, bots, broadcast, dispatch, bus, presence
     main.ts          # cluster primary  ·  worker.ts — one HTTP+socket worker
-  tests/             # vitest: engines, elo, cache, api, match lifecycle
+  tests/             # vitest: engines, elo, cache, api, matchmaking, progression, rooms
 frontend/
   src/
-    components/      # ui kit, layout, game boards (canvas Pong)
-    pages/           # lobby, play, leaderboard, profile, system
-    store/           # zustand: session + arcade
-    lib/             # api client, socket manager
+    components/      # ui kit, layout, progress widgets, 7 game boards (canvas Pong & Snake)
+    pages/           # lobby, play, leaderboard, achievements, profile, system
+    store/           # zustand: session, arcade, progression, toasts
+    lib/             # api client, socket manager, Web Audio sound engine
 ```
 
 ## Testing & quality
@@ -277,7 +333,7 @@ frontend/
 ```bash
 npm run lint        # eslint (typescript-eslint, flat config)
 npm run typecheck   # tsc --noEmit across all workspaces
-npm test            # vitest — 35 tests
+npm test            # vitest — 76 tests
 npm run build       # shared → server → frontend
 ```
 

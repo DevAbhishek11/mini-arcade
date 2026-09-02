@@ -5,12 +5,17 @@ import type { GameEngine } from '@mini-arcade/shared';
 import { config } from '../config/env.js';
 import { leaderboardService } from '../domain/leaderboard-service.js';
 import { playerService } from '../domain/player-service.js';
+import type { ProgressDelta } from '@mini-arcade/shared';
+import { progressionService } from '../domain/progression-service.js';
 import type { MatchPlayerResult } from '../domain/storage.js';
+import type { BotDifficulty } from './bot.js';
 import { getStorage } from '../domain/storage/index.js';
 import { createLogger } from '../infra/logger.js';
 import { matchesActive, matchesTotal } from '../infra/metrics.js';
 
 const log = createLogger('match');
+
+export type MatchSource = 'ranked' | 'room' | 'practice';
 
 export interface MatchParticipant {
   playerId: string;
@@ -21,6 +26,7 @@ export interface MatchParticipant {
   seat: Seat;
   connected: boolean;
   isBot: boolean;
+  difficulty?: BotDifficulty;
   /** Bus node that owns this player's socket. */
   nodeId: string;
   disconnectedAt: number | null;
@@ -32,6 +38,8 @@ export interface MatchEndSummary {
   winnerSeat: Seat | null;
   reason: MatchEndReason;
   ratingDelta: Record<string, number>;
+  /** Per human player XP / achievements / quests earned by this match. */
+  progress: Record<string, ProgressDelta>;
 }
 
 /**
@@ -53,7 +61,14 @@ export class Match {
   lastActivityAt = Date.now();
   endSummary: MatchEndSummary | null = null;
 
-  constructor(gameId: GameId, participants: MatchParticipant[], id = randomUUID()) {
+  constructor(
+    gameId: GameId,
+    participants: MatchParticipant[],
+    id = randomUUID(),
+    readonly source: MatchSource = 'ranked',
+    /** Private room this match belongs to, when applicable. */
+    readonly roomCode: string | null = null,
+  ) {
     this.id = id;
     this.gameId = gameId;
     this.engine = getEngine(gameId);
@@ -186,6 +201,7 @@ export class Match {
       winnerSeat,
       reason,
       ratingDelta,
+      progress: {},
     };
     this.endSummary = summary;
 
@@ -200,12 +216,45 @@ export class Match {
       });
       await playerService.invalidate(...results.map((r) => r.playerId));
       await leaderboardService.invalidate();
+
+      // Progression is best effort: a failure here must never lose a match result.
+      await Promise.all(
+        this.participants
+          .filter((p) => !p.isBot)
+          .map(async (participant) => {
+            const opponent = this.participants.find((p) => p.playerId !== participant.playerId);
+            const result =
+              winnerSeat === null ? ('draw' as const) : winnerSeat === participant.seat ? ('win' as const) : ('loss' as const);
+            try {
+              summary.progress[participant.playerId] = await progressionService.recordMatch({
+                playerId: participant.playerId,
+                gameId: this.gameId,
+                result,
+                ratingDelta: ratingDelta[participant.playerId] ?? 0,
+                ownRating: participant.rating,
+                opponentRating: opponent?.rating ?? participant.rating,
+                source: this.source,
+                flawless: this.isFlawlessFor(participant.seat),
+              });
+            } catch (error) {
+              log.warn({ err: (error as Error).message }, 'progression update failed');
+            }
+          }),
+      );
     } catch (error) {
       log.error({ matchId: this.id, err: (error as Error).message }, 'failed to persist match result');
     }
 
     log.info({ matchId: this.id, game: this.gameId, reason, winnerSeat }, 'match finished');
     return summary;
+  }
+
+  /** Pong/Snake specific: did this seat win without conceding anything? */
+  private isFlawlessFor(seat: Seat): boolean {
+    const state = this.state as { score?: [number, number] };
+    if (!Array.isArray(state?.score)) return false;
+    const opponent = seat === 0 ? 1 : 0;
+    return (state.score[seat] ?? 0) > 0 && (state.score[opponent] ?? 0) === 0;
   }
 
   /** True when everyone has been gone longer than the reconnect grace period. */

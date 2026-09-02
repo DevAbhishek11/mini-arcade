@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
+import { Toaster } from '@/components/ui/Toaster';
+import { AchievementsPage } from '@/pages/AchievementsPage';
 import { LeaderboardPage } from '@/pages/LeaderboardPage';
 import { LobbyPage } from '@/pages/LobbyPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -9,6 +11,7 @@ import { PlayPage } from '@/pages/PlayPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SystemPage } from '@/pages/SystemPage';
 import { useArcade } from '@/store/arcade';
+import { useProgression } from '@/store/progression';
 import { useSession } from '@/store/session';
 
 function BootScreen({ error }: { error: string | null }) {
@@ -37,10 +40,16 @@ function BootScreen({ error }: { error: string | null }) {
 export default function App() {
   const { status, error, bootstrap } = useSession();
   const listen = useArcade((s) => s.listen);
+  const loadProgress = useProgression((s) => s.load);
+  const subscribeProgress = useProgression((s) => s.subscribe);
 
   useEffect(() => {
-    void bootstrap().then(listen);
-  }, [bootstrap, listen]);
+    void bootstrap().then(() => {
+      listen();
+      subscribeProgress();
+      void loadProgress();
+    });
+  }, [bootstrap, listen, loadProgress, subscribeProgress]);
 
   if (status !== 'ready') return <BootScreen error={status === 'error' ? error : null} />;
 
@@ -50,11 +59,13 @@ export default function App() {
         <Route path="/" element={<LobbyPage />} />
         <Route path="/play/:gameId" element={<PlayPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="/achievements" element={<AchievementsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/system" element={<SystemPage />} />
         <Route path="/play" element={<Navigate to="/" replace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <Toaster />
     </AppShell>
   );
 }

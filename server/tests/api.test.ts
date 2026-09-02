@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { GAME_IDS } from '@mini-arcade/shared';
 import type { Express } from 'express';
 
 let app: Express;
@@ -38,11 +39,39 @@ describe('system routes', () => {
 describe('game catalog', () => {
   it('lists every cabinet', async () => {
     const response = await request(app).get('/api/games').expect(200);
-    expect(response.body.items.map((g: { id: string }) => g.id)).toEqual([
-      'tic-tac-toe',
-      'connect-four',
-      'pong',
-    ]);
+    expect(response.body.items.map((g: { id: string }) => g.id)).toEqual([...GAME_IDS]);
+  });
+
+  it('describes how to play every cabinet', async () => {
+    const response = await request(app).get('/api/games').expect(200);
+    for (const game of response.body.items as { howTo: string[]; averageMinutes: number }[]) {
+      expect(game.howTo.length).toBeGreaterThan(1);
+      expect(game.averageMinutes).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('progression api', () => {
+  it('serves the achievement and quest catalog without auth', async () => {
+    const response = await request(app).get('/api/progress/catalog').expect(200);
+    expect(response.body.achievements.length).toBe(12);
+    expect(response.body.quests.length).toBeGreaterThan(2);
+  });
+
+  it('returns a fresh progress profile for a new guest', async () => {
+    const created = await request(app).post('/api/auth/guest').send({}).expect(201);
+    const response = await request(app)
+      .get('/api/progress/me')
+      .set('authorization', `Bearer ${created.body.token}`)
+      .expect(200);
+
+    expect(response.body.progress.xp).toBe(0);
+    expect(response.body.progress.level.level).toBe(1);
+    expect(response.body.progress.quests).toHaveLength(3);
+  });
+
+  it('rejects an unauthenticated progress lookup', async () => {
+    await request(app).get('/api/progress/me').expect(401);
   });
 });
 

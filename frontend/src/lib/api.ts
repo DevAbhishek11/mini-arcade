@@ -1,11 +1,15 @@
 import type {
+  AchievementDef,
   ApiError,
   ArcadeStats,
   GameCatalogEntry,
   HealthReport,
   LeaderboardEntry,
   Paginated,
+  PlayerProgress,
   PlayerPublic,
+  QuestDef,
+  QuestProgress,
 } from '@mini-arcade/shared';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
@@ -106,6 +110,12 @@ export const api = {
     request<Paginated<LeaderboardEntry>>(`/leaderboard?game=${game}&limit=${limit}&offset=${offset}`, {
       auth: false,
     }),
+  progress: () => request<{ progress: PlayerProgress }>('/progress/me'),
+  progressOf: (id: string) => request<{ progress: PlayerProgress }>(`/progress/${id}`, { auth: false }),
+  progressCatalog: () =>
+    request<{ achievements: AchievementDef[]; quests: QuestDef[] }>('/progress/catalog', { auth: false }),
+  questsToday: () =>
+    request<{ day: string; definitions: QuestDef[]; progress: QuestProgress[] }>('/progress/quests/today'),
   stats: () => request<ArcadeStats>('/system/stats', { auth: false }),
   health: () => request<HealthReport>('/system', { auth: false }),
   runtime: () =>

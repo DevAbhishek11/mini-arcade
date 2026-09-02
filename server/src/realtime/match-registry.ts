@@ -1,3 +1,4 @@
+import { LRUCache } from 'lru-cache';
 import type { MatchEndReason, Seat } from '@mini-arcade/shared';
 import { config } from '../config/env.js';
 import { createLogger } from '../infra/logger.js';
@@ -13,6 +14,8 @@ export interface RegistryHooks {
   onState(match: Match): void;
   onOver(match: Match, reason: MatchEndReason, winnerSeat: Seat | null): void;
   onPresence(match: Match): void;
+  /** Fired once, right after a match is registered on this worker. */
+  onCreated(match: Match): void;
 }
 
 const SCHEDULER_HZ = 30;
@@ -28,6 +31,8 @@ const SCHEDULER_INTERVAL_MS = 1000 / SCHEDULER_HZ;
 class MatchRegistry {
   private readonly matches = new Map<string, Match>();
   private readonly botTimers = new Map<string, NodeJS.Timeout>();
+  /** Recently finished matches, retained briefly so rematches can be offered. */
+  private readonly recent = new LRUCache<string, Match>({ max: 300, ttl: 120_000 });
   private readonly lastTickAt = new Map<string, number>();
   private readonly lastBroadcastAt = new Map<string, number>();
   private hooks: RegistryHooks | null = null;
@@ -50,12 +55,18 @@ class MatchRegistry {
     this.lastTickAt.set(match.id, Date.now());
     void presence.matchStarted(match.id);
     this.start();
+    this.hooks?.onCreated(match);
     // A bot on seat 0 has to open the game.
     this.scheduleBot(match);
   }
 
   get(matchId: string): Match | undefined {
     return this.matches.get(matchId);
+  }
+
+  /** A live match, or one that finished in the last couple of minutes. */
+  getRecent(matchId: string): Match | undefined {
+    return this.matches.get(matchId) ?? this.recent.get(matchId);
   }
 
   hosts(matchId: string): boolean {
@@ -80,6 +91,7 @@ class MatchRegistry {
     this.matches.delete(match.id);
     this.lastTickAt.delete(match.id);
     this.lastBroadcastAt.delete(match.id);
+    this.recent.set(match.id, match);
     const timer = this.botTimers.get(match.id);
     if (timer) {
       clearTimeout(timer);
@@ -127,7 +139,7 @@ class MatchRegistry {
     if (this.botTimers.has(match.id)) return;
     const bot = match.participants.find((p) => p.isBot);
     if (!bot) return;
-    const decision = decide(match.gameId, match.state, bot.seat);
+    const decision = decide(match.gameId, match.state, bot.seat, bot.difficulty);
     if (!decision) return;
 
     const timer = setTimeout(() => {

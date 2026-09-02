@@ -16,6 +16,11 @@ export interface CacheOptions {
   ttlMs?: number;
   /** Time to live in ms for the process local (L1) layer. Defaults to min(ttlMs, CACHE_L1_TTL_MS). */
   l1TtlMs?: number;
+  /**
+   * Serve a stale value for up to this long after expiry while a refresh runs
+   * in the background. Turns a slow origin into a sub-millisecond response.
+   */
+  staleWhileRevalidateMs?: number;
 }
 
 const INVALIDATION_CHANNEL = `${config.REDIS_KEY_PREFIX}cache:invalidate`;
@@ -117,10 +122,22 @@ class LayeredCache {
     }
   }
 
-  /** Cache aside helper with single flight de-duplication. */
+  /** Cache aside helper with single flight de-duplication and optional SWR. */
   async wrap<T>(key: string, options: CacheOptions, loader: () => Promise<T>): Promise<T> {
     const cached = await this.get<T>(key);
     if (cached !== undefined) return cached;
+
+    // Stale-while-revalidate: return the expired L1 entry immediately and
+    // refresh in the background, so a cold origin never blocks a request.
+    const swr = options.staleWhileRevalidateMs ?? 0;
+    if (swr > 0) {
+      const stale = this.l1.peek(key) as Entry<T> | undefined;
+      if (stale && stale.expiresAt + swr > Date.now() && !this.inflight.has(key)) {
+        cacheOperations.inc({ layer: 'swr', result: 'stale' });
+        void this.refresh(key, options, loader);
+        return stale.value;
+      }
+    }
 
     const existing = this.inflight.get(key) as Promise<T> | undefined;
     if (existing) {
@@ -137,6 +154,21 @@ class LayeredCache {
 
     this.inflight.set(key, promise);
     return promise;
+  }
+
+  private async refresh<T>(key: string, options: CacheOptions, loader: () => Promise<T>): Promise<void> {
+    const promise = loader()
+      .then(async (value) => {
+        await this.set(key, value, options);
+        return value;
+      })
+      .catch((error: Error) => {
+        log.debug({ key, err: error.message }, 'background refresh failed');
+        return undefined as T;
+      })
+      .finally(() => this.inflight.delete(key));
+    this.inflight.set(key, promise);
+    await promise;
   }
 
   async invalidate(...prefixes: string[]): Promise<void> {

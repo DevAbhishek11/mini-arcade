@@ -4,7 +4,7 @@ import { config } from '../config/env.js';
 import { createLogger } from '../infra/logger.js';
 import { getRedis } from '../infra/redis.js';
 import { getStorage } from '../domain/storage/index.js';
-import { botIdentity } from './bot.js';
+import { botIdentity, type BotDifficulty } from './bot.js';
 import { bus, topics } from './bus.js';
 import { Match, type MatchParticipant } from './match.js';
 import { matchRegistry } from './match-registry.js';
@@ -19,6 +19,7 @@ export interface Ticket {
   avatar: string;
   rating: number;
   played: number;
+  level: number;
   gameId: GameId;
   nodeId: string;
   joinedAt: number;
@@ -225,15 +226,18 @@ class Matchmaker {
     }));
 
     if (participants.length === 1) {
-      const bot = botIdentity();
+      // Match the bot roughly to the waiting player's rating.
+      const ticket = tickets[0] as Ticket;
+      const difficulty: BotDifficulty = ticket.rating >= 1400 ? 'brutal' : ticket.rating >= 1240 ? 'sharp' : 'chill';
       participants.push({
-        ...bot,
+        ...botIdentity(difficulty),
         avatar: 'nebula',
-        rating: 1180 + Math.floor(Math.random() * 120),
+        rating: Math.max(1000, Math.round(ticket.rating + (Math.random() * 80 - 40))),
         played: 50,
         seat: 1,
         connected: true,
         isBot: true,
+        difficulty,
         nodeId: bus.nodeId,
         disconnectedAt: null,
       });

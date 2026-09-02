@@ -1,15 +1,35 @@
+import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
+import { StreakFlame } from '@/components/progress/StreakFlame';
+import { XpBar } from '@/components/progress/XpBar';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
+import { sound } from '@/lib/sound';
+import { useProgression } from '@/store/progression';
 import { useSession } from '@/store/session';
 
 const LINKS = [
   { to: '/', label: 'Arcade', end: true },
   { to: '/leaderboard', label: 'Leaderboard' },
+  { to: '/achievements', label: 'Quests' },
   { to: '/profile', label: 'Profile' },
   { to: '/system', label: 'System' },
 ];
+
+function SoundToggle() {
+  const [on, setOn] = useState(sound.isEnabled);
+  return (
+    <button
+      type="button"
+      aria-label={on ? 'mute sound' : 'unmute sound'}
+      onClick={() => setOn(sound.toggle())}
+      className="grid size-9 place-items-center rounded-xl border border-white/5 bg-void-900/60 text-sm transition-colors hover:border-white/15"
+    >
+      {on ? '🔊' : '🔇'}
+    </button>
+  );
+}
 
 function ConnectionPill() {
   const connection = useSession((s) => s.connection);
@@ -32,6 +52,7 @@ function ConnectionPill() {
 
 export function Header() {
   const player = useSession((s) => s.player);
+  const progress = useProgression((s) => s.progress);
   const location = useLocation();
 
   return (
@@ -64,8 +85,11 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2.5">
+          {progress && <StreakFlame days={progress.dailyStreak} />}
+          {progress && <XpBar level={progress.level} compact />}
           <ConnectionPill />
+          <SoundToggle />
           {player && (
             <NavLink
               to="/profile"

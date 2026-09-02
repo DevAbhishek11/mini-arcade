@@ -17,6 +17,7 @@ import { authRouter } from './routes/auth.js';
 import { gamesRouter } from './routes/games.js';
 import { leaderboardRouter } from './routes/leaderboard.js';
 import { playersRouter } from './routes/players.js';
+import { progressRouter } from './routes/progress.js';
 import { metricsRouter, systemRouter } from './routes/system.js';
 
 export function createApp(): Express {
@@ -71,6 +72,7 @@ export function createApp(): Express {
   app.use('/api/games', gamesRouter);
   app.use('/api/players', playersRouter);
   app.use('/api/leaderboard', leaderboardRouter);
+  app.use('/api/progress', progressRouter);
   app.use('/metrics', metricsRouter);
 
   app.get('/', (_req, res) => {
@@ -78,7 +80,14 @@ export function createApp(): Express {
       name: 'Mini Arcade API',
       version: config.VERSION,
       docs: '/api/system',
-      endpoints: ['/api/games', '/api/leaderboard', '/api/auth/guest', '/api/system', '/metrics'],
+      endpoints: [
+        '/api/games',
+        '/api/leaderboard',
+        '/api/progress/catalog',
+        '/api/auth/guest',
+        '/api/system',
+        '/metrics',
+      ],
     });
   });
 
