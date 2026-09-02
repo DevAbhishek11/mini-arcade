@@ -1,0 +1,100 @@
+name: mini-arcade
+
+# Full production-shaped stack:
+#   nginx (SPA + sticky reverse proxy) → N api replicas (each clustered)
+#   → postgres (durable state) + redis (cache, pub/sub, socket.io adapter)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-arcade}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arcade}
+      POSTGRES_DB: ${POSTGRES_DB:-arcade}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-arcade} -d ${POSTGRES_DB:-arcade}']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: '1.0', memory: 512M }
+    networks: [arcade]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - 'no'
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - ''
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 320M }
+    networks: [arcade]
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    # Scale horizontally: docker compose up -d --scale api=3
+    deploy:
+      replicas: ${API_REPLICAS:-2}
+      resources:
+        limits: { cpus: '1.0', memory: 512M }
+        reservations: { cpus: '0.25', memory: 128M }
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Each container runs its own worker cluster.
+      CLUSTER_WORKERS: ${CLUSTER_WORKERS:-2}
+      WORKER_MAX_RSS_MB: 400
+      DATABASE_URL: postgres://${POSTGRES_USER:-arcade}:${POSTGRES_PASSWORD:-arcade}@postgres:5432/${POSTGRES_DB:-arcade}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-please-32-chars}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      TRUST_PROXY: 'true'
+      BOT_FILL_MS: ${BOT_FILL_MS:-12000}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    stop_grace_period: 30s
+    networks: [arcade]
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-8080}:80'
+    depends_on:
+      - api
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 128M }
+    networks: [arcade]
+
+volumes:
+  postgres-data:
+
+networks:
+  arcade:
+    driver: bridge

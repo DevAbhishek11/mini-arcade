@@ -1,0 +1,163 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --color-void-950: #05060c;
+  --color-void-900: #080a14;
+  --color-void-850: #0b0e1b;
+  --color-void-800: #101426;
+  --color-void-700: #171d33;
+  --color-void-600: #232a45;
+  --color-void-500: #333c5e;
+
+  --color-neon-cyan: #22d3ee;
+  --color-neon-violet: #a855f7;
+  --color-neon-pink: #f472b6;
+  --color-neon-lime: #a3e635;
+  --color-neon-amber: #fbbf24;
+
+  --radius-card: 1.25rem;
+
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-slide-up: slide-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop: pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-neon-cyan) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-void-600) transparent;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-void-950 text-slate-200 font-sans antialiased;
+    background-image:
+      radial-gradient(
+        60rem 40rem at 10% -10%,
+        color-mix(in oklab, var(--color-neon-violet) 12%, transparent),
+        transparent
+      ),
+      radial-gradient(
+        50rem 36rem at 110% 10%,
+        color-mix(in oklab, var(--color-neon-cyan) 10%, transparent),
+        transparent
+      );
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight text-white;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-neon-cyan) 35%, transparent);
+  }
+}
+
+@layer components {
+  .surface {
+    @apply rounded-[--radius-card] border border-white/5 bg-void-900/70 backdrop-blur-xl;
+    box-shadow:
+      0 1px 0 0 rgb(255 255 255 / 0.04) inset,
+      0 24px 60px -30px rgb(0 0 0 / 0.9);
+  }
+
+  .surface-hover {
+    @apply transition-all duration-300 hover:border-white/12 hover:bg-void-850/80;
+  }
+
+  .grid-backdrop {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+  }
+
+  .neon-text {
+    text-shadow: 0 0 24px color-mix(in oklab, currentColor 55%, transparent);
+  }
+
+  .skeleton {
+    @apply rounded-lg bg-void-800;
+    background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.06), transparent);
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

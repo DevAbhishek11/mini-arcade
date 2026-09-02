@@ -1,0 +1,30 @@
+# Local dependencies only — run the apps with `npm run dev` on the host.
+#   docker compose -f docker-compose.dev.yml up -d
+#   DATABASE_URL=postgres://arcade:arcade@localhost:5432/arcade REDIS_URL=redis://localhost:6379 npm run dev
+name: mini-arcade-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: arcade
+      POSTGRES_PASSWORD: arcade
+      POSTGRES_DB: arcade
+    ports: ['5432:5432']
+    volumes: ['postgres-dev:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U arcade']
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--maxmemory', '128mb', '--maxmemory-policy', 'allkeys-lru']
+    ports: ['6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 5
+
+volumes:
+  postgres-dev:
