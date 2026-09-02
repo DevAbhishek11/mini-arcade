@@ -37,7 +37,11 @@ export function DotsAndBoxesBoard({
     const isLast = state.lastEdge === edge;
     const interactive = !drawn && yourTurn;
     return (
-      <g key={edge} className={clsx(interactive && 'cursor-pointer')} onClick={interactive ? () => onPlay(edge) : undefined}>
+      <g
+        key={edge}
+        className={clsx(interactive && 'cursor-pointer')}
+        onClick={interactive ? () => onPlay(edge) : undefined}
+      >
         <line
           x1={x1}
           y1={y1}
@@ -67,7 +71,9 @@ export function DotsAndBoxesBoard({
           <div key={s} className="flex items-center gap-2">
             <span className="size-3 rounded-sm" style={{ background: SEAT_COLOR[s] }} />
             <span className="font-display text-xl font-bold tabular-nums text-white">{state.score[s]}</span>
-            <span className="text-[0.65rem] uppercase tracking-wider text-slate-500">{s === seat ? 'you' : 'them'}</span>
+            <span className="text-[0.65rem] uppercase tracking-wider text-slate-500">
+              {s === seat ? 'you' : 'them'}
+            </span>
           </div>
         ))}
       </div>

@@ -31,7 +31,9 @@ export function XpBar({ level, compact = false }: { level: LevelProgress; compac
       </div>
       <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-void-800">
         <div
-          className={clsx('h-full rounded-full bg-gradient-to-r from-neon-cyan via-neon-violet to-neon-pink transition-[width] duration-700')}
+          className={clsx(
+            'h-full rounded-full bg-gradient-to-r from-neon-cyan via-neon-violet to-neon-pink transition-[width] duration-700',
+          )}
           style={{ width: `${percent}%` }}
         />
       </div>

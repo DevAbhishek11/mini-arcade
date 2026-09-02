@@ -37,7 +37,9 @@ export function AchievementGrid({ unlocked }: { unlocked: UnlockedAchievement[] 
               </div>
               <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{achievement.description}</p>
               <p className="mt-1 font-mono text-[0.65rem] text-slate-600">
-                {isUnlocked ? `unlocked ${new Date(at as string).toLocaleDateString()}` : `+${achievement.xp} XP`}
+                {isUnlocked
+                  ? `unlocked ${new Date(at as string).toLocaleDateString()}`
+                  : `+${achievement.xp} XP`}
               </p>
             </div>
           </div>

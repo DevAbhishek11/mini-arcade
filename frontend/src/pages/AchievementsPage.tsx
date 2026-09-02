@@ -23,8 +23,8 @@ export function AchievementsPage() {
         <CardLabel>Your journey</CardLabel>
         <h1 className="mt-1 text-3xl font-bold">Quests &amp; achievements</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-400">
-          Every match earns XP. Daily quests reroll at midnight, streaks stack a bonus up to +50 XP per match, and
-          achievements are permanent bragging rights.
+          Every match earns XP. Daily quests reroll at midnight, streaks stack a bonus up to +50 XP per match,
+          and achievements are permanent bragging rights.
         </p>
       </section>
 
@@ -67,7 +67,9 @@ export function AchievementsPage() {
 
           <Card>
             <CardLabel>Games mastered</CardLabel>
-            <p className="mt-2 text-xs text-slate-500">Win at least once in every cabinet to unlock Polyglot.</p>
+            <p className="mt-2 text-xs text-slate-500">
+              Win at least once in every cabinet to unlock Polyglot.
+            </p>
             <ul className="mt-3 space-y-1.5">
               {(Object.keys(GAME_CATALOG) as GameId[]).map((id) => {
                 const won = progress?.gamesWon.includes(id) ?? false;

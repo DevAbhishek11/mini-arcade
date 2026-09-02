@@ -89,7 +89,9 @@ class SoundEngine {
       return this.context;
     }
     try {
-      const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const Ctor =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.context = new Ctor();
       this.master = this.context.createGain();
       this.master.gain.value = 0.5;
@@ -113,7 +115,8 @@ class SoundEngine {
 
       oscillator.type = tone.type;
       oscillator.frequency.setValueAtTime(tone.freq, startAt);
-      if (tone.slideTo) oscillator.frequency.exponentialRampToValueAtTime(tone.slideTo, startAt + tone.duration);
+      if (tone.slideTo)
+        oscillator.frequency.exponentialRampToValueAtTime(tone.slideTo, startAt + tone.duration);
 
       const peak = tone.gain ?? 0.08;
       gain.gain.setValueAtTime(0.0001, startAt);

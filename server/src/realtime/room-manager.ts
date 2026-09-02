@@ -18,12 +18,7 @@ export interface RoomRecord extends RoomInfo {
 }
 
 export type RoomError =
-  | 'ROOM_NOT_FOUND'
-  | 'ROOM_FULL'
-  | 'ROOM_IN_PROGRESS'
-  | 'NOT_HOST'
-  | 'NOT_READY'
-  | 'ROOM_LIMIT';
+  'ROOM_NOT_FOUND' | 'ROOM_FULL' | 'ROOM_IN_PROGRESS' | 'NOT_HOST' | 'NOT_READY' | 'ROOM_LIMIT';
 
 function generateCode(): string {
   let code = '';
@@ -125,9 +120,7 @@ class RoomManager {
   async setReady(code: string, playerId: string, ready: boolean): Promise<RoomRecord> {
     const room = await this.get(code);
     if (!room) throw new Error('ROOM_NOT_FOUND' satisfies RoomError);
-    room.members = room.members.map((member) =>
-      member.playerId === playerId ? { ...member, ready } : member,
-    );
+    room.members = room.members.map((member) => (member.playerId === playerId ? { ...member, ready } : member));
     await this.write(room);
     return room;
   }

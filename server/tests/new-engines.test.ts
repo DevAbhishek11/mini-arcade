@@ -44,7 +44,8 @@ describe('gomoku engine', () => {
     // Seat 0 builds a horizontal run on row 0, seat 1 answers far away on row 5.
     for (let i = 0; i < 5; i += 1) {
       state = gomokuEngine.apply(state, 0, { type: 'place', index: i }, now()).state;
-      if (i < 4) state = gomokuEngine.apply(state, 1, { type: 'place', index: 5 * GOMOKU_SIZE + i }, now()).state;
+      if (i < 4)
+        state = gomokuEngine.apply(state, 1, { type: 'place', index: 5 * GOMOKU_SIZE + i }, now()).state;
     }
     const outcome = gomokuEngine.outcome(state);
     expect(outcome.finished).toBe(true);

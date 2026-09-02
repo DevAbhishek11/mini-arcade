@@ -2,7 +2,7 @@
   "name": "mini-arcade",
   "version": "1.0.0",
   "private": true,
-  "description": "Mini Arcade — realtime multiplayer arcade platform (TypeScript monorepo)",
+  "description": "Mini Arcade \u2014 realtime multiplayer arcade platform (TypeScript monorepo)",
   "type": "module",
   "engines": {
     "node": ">=20.11.0"
@@ -22,10 +22,12 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
-    "test": "npm run test -w @mini-arcade/server",
+    "test": "npm run test --workspaces --if-present",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down -v",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "test:server": "npm run test -w @mini-arcade/server",
+    "test:web": "npm run test -w @mini-arcade/frontend"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",

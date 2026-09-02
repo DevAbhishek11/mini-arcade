@@ -7,26 +7,11 @@ import {
   GAME_CATALOG,
   isGameId,
   type BotDifficultyId,
-  type ConnectFourState,
-  type Direction,
-  type DotsState,
   type Emote,
-  type GomokuState,
   type MatchSnapshot,
-  type PaddleDirection,
-  type PongState,
-  type ReversiState,
   type Seat,
-  type SnakeState,
-  type TicTacToeState,
 } from '@mini-arcade/shared';
-import { ConnectFourBoard } from '@/components/games/ConnectFourBoard';
-import { DotsAndBoxesBoard } from '@/components/games/DotsAndBoxesBoard';
-import { GomokuBoard } from '@/components/games/GomokuBoard';
-import { PongCanvas } from '@/components/games/PongCanvas';
-import { ReversiBoard } from '@/components/games/ReversiBoard';
-import { SnakeDuelCanvas } from '@/components/games/SnakeDuelCanvas';
-import { TicTacToeBoard } from '@/components/games/TicTacToeBoard';
+import { GameBoard } from '@/components/games/GameBoard';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -437,11 +422,24 @@ function ResultOverlay() {
 
         {progress && (
           <div className="mt-4 space-y-1.5 rounded-xl border border-white/5 bg-void-950/50 p-3 text-left text-xs text-slate-400">
-            <Row label="Level" value={progress.leveledUp ? `${progress.levelBefore} → ${progress.levelAfter} 🎉` : `${progress.levelAfter}`} />
-            <Row label="Daily streak" value={`${progress.dailyStreak} day${progress.dailyStreak === 1 ? '' : 's'}`} />
+            <Row
+              label="Level"
+              value={
+                progress.leveledUp
+                  ? `${progress.levelBefore} → ${progress.levelAfter} 🎉`
+                  : `${progress.levelAfter}`
+              }
+            />
+            <Row
+              label="Daily streak"
+              value={`${progress.dailyStreak} day${progress.dailyStreak === 1 ? '' : 's'}`}
+            />
             <Row label="Win streak" value={`${progress.winStreak}`} />
             {progress.unlocked.length > 0 && (
-              <Row label="Unlocked" value={progress.unlocked.map((entry) => `${entry.icon} ${entry.name}`).join(', ')} />
+              <Row
+                label="Unlocked"
+                value={progress.unlocked.map((entry) => `${entry.icon} ${entry.name}`).join(', ')}
+              />
             )}
             {progress.questsCompleted.length > 0 && (
               <Row label="Quests" value={progress.questsCompleted.map((quest) => quest.name).join(', ')} />
@@ -449,7 +447,9 @@ function ResultOverlay() {
           </div>
         )}
 
-        {rematchOffer && <p className="mt-4 text-sm text-neon-cyan">{rematchOffer.fromNickname} wants a rematch!</p>}
+        {rematchOffer && (
+          <p className="mt-4 text-sm text-neon-cyan">{rematchOffer.fromNickname} wants a rematch!</p>
+        )}
 
         <div className="mt-6 grid gap-2 sm:grid-cols-2">
           <Button
@@ -497,13 +497,17 @@ function ChatPanel() {
     <Card className="flex h-72 flex-col p-4">
       <CardLabel>Table talk</CardLabel>
       <div ref={listRef} className="mt-3 flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
-        {chat.length === 0 && <p className="text-xs text-slate-600">Say hello — messages stay in this match.</p>}
+        {chat.length === 0 && (
+          <p className="text-xs text-slate-600">Say hello — messages stay in this match.</p>
+        )}
         {chat.map((message) => (
           <div
             key={message.id}
             className={clsx(
               'max-w-[85%] rounded-lg px-2.5 py-1.5',
-              message.playerId === player?.id ? 'ml-auto bg-neon-cyan/10 text-neon-cyan' : 'bg-white/5 text-slate-300',
+              message.playerId === player?.id
+                ? 'ml-auto bg-neon-cyan/10 text-neon-cyan'
+                : 'bg-white/5 text-slate-300',
             )}
           >
             <span className="mr-1.5 text-[0.65rem] uppercase tracking-wide opacity-60">{message.nickname}</span>
@@ -559,72 +563,15 @@ export function PlayPage() {
 
   const board = useMemo(() => {
     if (!snapshot || !gameId) return null;
-    switch (gameId) {
-      case 'tic-tac-toe':
-        return (
-          <TicTacToeBoard
-            state={snapshot.state as TicTacToeState}
-            seat={seat}
-            yourTurn={yourTurn}
-            onPlay={(index) => void sendAction({ type: 'place', index })}
-          />
-        );
-      case 'connect-four':
-        return (
-          <ConnectFourBoard
-            state={snapshot.state as ConnectFourState}
-            seat={seat}
-            yourTurn={yourTurn}
-            onPlay={(column) => void sendAction({ type: 'drop', column })}
-          />
-        );
-      case 'gomoku':
-        return (
-          <GomokuBoard
-            state={snapshot.state as GomokuState}
-            seat={seat}
-            yourTurn={yourTurn}
-            onPlay={(index) => void sendAction({ type: 'place', index })}
-          />
-        );
-      case 'reversi':
-        return (
-          <ReversiBoard
-            state={snapshot.state as ReversiState}
-            seat={seat}
-            yourTurn={yourTurn}
-            onPlay={(index) => void sendAction({ type: 'place', index })}
-            onPass={() => void sendAction({ type: 'pass' })}
-          />
-        );
-      case 'dots-and-boxes':
-        return (
-          <DotsAndBoxesBoard
-            state={snapshot.state as DotsState}
-            seat={seat}
-            yourTurn={yourTurn}
-            onPlay={(edge) => void sendAction({ type: 'draw', edge })}
-          />
-        );
-      case 'pong':
-        return (
-          <PongCanvas
-            state={snapshot.state as PongState}
-            seat={seat}
-            onInput={(dir: PaddleDirection) => void sendAction({ type: 'move', dir })}
-          />
-        );
-      case 'snake-duel':
-        return (
-          <SnakeDuelCanvas
-            state={snapshot.state as SnakeState}
-            seat={seat}
-            onTurn={(dir: Direction) => void sendAction({ type: 'turn', dir })}
-          />
-        );
-      default:
-        return null;
-    }
+    return (
+      <GameBoard
+        gameId={gameId}
+        state={snapshot.state}
+        seat={seat}
+        yourTurn={yourTurn}
+        onAction={(action) => void sendAction(action)}
+      />
+    );
   }, [snapshot, gameId, seat, yourTurn, sendAction]);
 
   if (!gameId || !game) return null;

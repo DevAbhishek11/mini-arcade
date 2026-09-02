@@ -11,6 +11,7 @@ import { useSession } from '@/store/session';
 
 const LINKS = [
   { to: '/', label: 'Arcade', end: true },
+  { to: '/solo/tic-tac-toe', label: 'Solo' },
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/achievements', label: 'Quests' },
   { to: '/profile', label: 'Profile' },

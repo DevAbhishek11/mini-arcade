@@ -13,6 +13,8 @@ export const BALL_MAX_SPEED = 780;
 export const BALL_SPEEDUP = 1.06;
 export const WINNING_SCORE = 5;
 export const SERVE_DELAY_MS = 900;
+/** Hard stop so two evenly matched players (or bots) cannot rally forever. */
+export const PONG_ROUND_LIMIT_MS = 6 * 60_000;
 
 export type PaddleDirection = -1 | 0 | 1;
 
@@ -26,6 +28,8 @@ export interface PongState {
   rallyHits: number;
   winnerSeat: Seat | null;
   elapsedMs: number;
+  /** Set when the round clock expires; the higher score wins, equal is a draw. */
+  timeUp: boolean;
 }
 
 export type PongAction = { type: 'move'; dir: PaddleDirection } | { type: 'stop' };
@@ -71,6 +75,7 @@ export const pongEngine: GameEngine<PongState, PongAction> = {
       rallyHits: 0,
       winnerSeat: null,
       elapsedMs: 0,
+      timeUp: false,
     };
     return base;
   },
@@ -88,7 +93,7 @@ export const pongEngine: GameEngine<PongState, PongAction> = {
   },
 
   tick(state, dtMs) {
-    if (state.winnerSeat !== null) return state;
+    if (state.winnerSeat !== null || state.timeUp) return state;
     const dt = dtMs / 1000;
     const halfPaddle = PADDLE_HEIGHT / 2;
 
@@ -98,6 +103,8 @@ export const pongEngine: GameEngine<PongState, PongAction> = {
     })) as PongState['paddles'];
 
     let next: PongState = { ...state, paddles, elapsedMs: state.elapsedMs + dtMs };
+
+    if (next.elapsedMs >= PONG_ROUND_LIMIT_MS) return { ...next, timeUp: true };
 
     if (next.serveCountdownMs > 0) {
       const remaining = next.serveCountdownMs - dtMs;
@@ -170,6 +177,11 @@ export const pongEngine: GameEngine<PongState, PongAction> = {
   outcome(state): GameOutcome {
     if (state.winnerSeat !== null) {
       return { finished: true, winnerSeat: state.winnerSeat, reason: 'victory' };
+    }
+    if (state.timeUp) {
+      const [a, b] = state.score;
+      if (a === b) return { finished: true, winnerSeat: null, reason: 'draw' };
+      return { finished: true, winnerSeat: a > b ? 0 : 1, reason: 'victory' };
     }
     return UNFINISHED;
   },

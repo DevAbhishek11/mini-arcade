@@ -116,7 +116,9 @@ export function registerRoomHandlers(socket: ArcadeSocket): void {
   });
 
   socket.on('room:join', async ({ code }, ack) => {
-    const normalized = String(code ?? '').trim().toUpperCase();
+    const normalized = String(code ?? '')
+      .trim()
+      .toUpperCase();
     if (normalized.length !== 5) return ack?.({ ok: false, code: 'BAD_CODE' });
     if (!allow('room', playerId)) return ack?.({ ok: false, code: 'RATE_LIMITED' });
 

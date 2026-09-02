@@ -69,7 +69,8 @@ const ROOM_ERRORS: Record<string, string> = {
   RATE_LIMITED: 'Slow down a moment',
 };
 
-const describe = (code?: string) => (code ? (ROOM_ERRORS[code] ?? code.replaceAll('_', ' ').toLowerCase()) : 'Something went wrong');
+const describe = (code?: string) =>
+  code ? (ROOM_ERRORS[code] ?? code.replaceAll('_', ' ').toLowerCase()) : 'Something went wrong';
 
 export const useArcade = create<ArcadeState>((set, get) => ({
   phase: 'idle',
@@ -139,7 +140,11 @@ export const useArcade = create<ArcadeState>((set, get) => ({
           toast.reward(`Level ${levelAfter}!`, 'Your arcade rank just went up.', '🎉');
         }
         for (const achievement of unlocked) {
-          toast.reward(`Achievement: ${ACHIEVEMENTS[achievement.id]?.name ?? achievement.name}`, achievement.description, achievement.icon);
+          toast.reward(
+            `Achievement: ${ACHIEVEMENTS[achievement.id]?.name ?? achievement.name}`,
+            achievement.description,
+            achievement.icon,
+          );
         }
         for (const quest of questsCompleted) {
           toast.reward(`Quest complete: ${quest.name}`, `+${quest.xp} XP`, quest.icon);
@@ -156,7 +161,10 @@ export const useArcade = create<ArcadeState>((set, get) => ({
 
     socket.on('match:emote', (payload) => {
       sound.play('emote');
-      const entry: FloatingEmote = { ...payload, key: `${payload.at}-${Math.random().toString(36).slice(2, 6)}` };
+      const entry: FloatingEmote = {
+        ...payload,
+        key: `${payload.at}-${Math.random().toString(36).slice(2, 6)}`,
+      };
       set({ emotes: [...get().emotes.slice(-8), entry] });
       window.setTimeout(() => set({ emotes: get().emotes.filter((item) => item.key !== entry.key) }), 2600);
     });
@@ -179,7 +187,8 @@ export const useArcade = create<ArcadeState>((set, get) => ({
     socket.on('progress:update', ({ progress }) => set({ progress }));
     socket.on('stats:update', (stats) => set({ stats }));
     socket.on('error:notice', (notice) => {
-      if (notice.code === 'SERVER_RESTARTING') toast.warning('Server restarting', 'Reconnecting automatically…');
+      if (notice.code === 'SERVER_RESTARTING')
+        toast.warning('Server restarting', 'Reconnecting automatically…');
     });
   },
 

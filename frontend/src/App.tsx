@@ -2,12 +2,14 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
+import { UpdatePrompt } from '@/components/pwa/UpdatePrompt';
 import { Toaster } from '@/components/ui/Toaster';
 import { AchievementsPage } from '@/pages/AchievementsPage';
 import { LeaderboardPage } from '@/pages/LeaderboardPage';
 import { LobbyPage } from '@/pages/LobbyPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { PlayPage } from '@/pages/PlayPage';
+import { SoloPage } from '@/pages/SoloPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SystemPage } from '@/pages/SystemPage';
 import { useArcade } from '@/store/arcade';
@@ -25,9 +27,12 @@ function BootScreen({ error }: { error: string | null }) {
           <>
             <h1 className="mt-6 text-xl font-bold">Cannot reach the arcade</h1>
             <p className="mt-2 max-w-sm text-sm text-slate-400">{error}</p>
-            <Button className="mt-6" onClick={() => window.location.reload()}>
-              Try again
-            </Button>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Button onClick={() => window.location.reload()}>Try again</Button>
+              <a href="/solo/tic-tac-toe">
+                <Button variant="outline">Play offline</Button>
+              </a>
+            </div>
           </>
         ) : (
           <p className="mt-6 animate-pulse text-sm text-slate-500">Inserting coin…</p>
@@ -58,14 +63,17 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LobbyPage />} />
         <Route path="/play/:gameId" element={<PlayPage />} />
+        <Route path="/solo/:gameId" element={<SoloPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/achievements" element={<AchievementsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/system" element={<SystemPage />} />
         <Route path="/play" element={<Navigate to="/" replace />} />
+        <Route path="/solo" element={<Navigate to="/solo/tic-tac-toe" replace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <Toaster />
+      <UpdatePrompt />
     </AppShell>
   );
 }

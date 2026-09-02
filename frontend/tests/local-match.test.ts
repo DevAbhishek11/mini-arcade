@@ -1,0 +1,251 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ticTacToeEngine, type SnakeState, type TicTacToeState } from '@mini-arcade/shared';
+import { LocalMatch, type LocalResult, type LocalSnapshot } from '@/lib/local-match';
+
+/** Drains the bot's think-timeouts until the match reports a result. */
+async function runTurnBased(
+  match: LocalMatch,
+  driveHuman: (snapshot: LocalSnapshot) => unknown | null,
+  latest: () => LocalSnapshot | null,
+) {
+  for (let guard = 0; guard < 200; guard += 1) {
+    if (match.isFinished) return;
+    const snapshot = latest();
+    if (snapshot && snapshot.controlledSeat === snapshot.seat) {
+      const action = driveHuman(snapshot);
+      if (action) match.play(action);
+    }
+    await vi.advanceTimersByTimeAsync(1500);
+  }
+}
+
+describe('LocalMatch — turn based', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('emits an initial snapshot as soon as it starts', () => {
+    const states: LocalSnapshot[] = [];
+    const match = new LocalMatch({
+      gameId: 'tic-tac-toe',
+      opponent: 'bot',
+      difficulty: 'sharp',
+      onState: (snapshot) => states.push(snapshot),
+      onOver: () => undefined,
+    });
+    match.start();
+
+    expect(states.length).toBeGreaterThan(0);
+    expect(states[0]?.seat).toBe(0);
+    expect((states[0]?.state as TicTacToeState).board).toHaveLength(9);
+    match.destroy();
+  });
+
+  it('rejects an illegal move and keeps the board untouched', () => {
+    let latest: LocalSnapshot | null = null;
+    const match = new LocalMatch({
+      gameId: 'tic-tac-toe',
+      opponent: 'bot',
+      difficulty: 'chill',
+      onState: (snapshot) => (latest = snapshot),
+      onOver: () => undefined,
+    });
+    match.start();
+
+    expect(match.play({ type: 'place', index: 99 })).toBe(false);
+    expect(match.play({ type: 'nonsense' })).toBe(false);
+    expect(((latest as unknown as LocalSnapshot).state as TicTacToeState).moves).toBe(0);
+    match.destroy();
+  });
+
+  it('plays a complete match against the bot and reports a result', async () => {
+    let latest: LocalSnapshot | null = null;
+    let result: LocalResult | null = null;
+
+    const match = new LocalMatch({
+      gameId: 'tic-tac-toe',
+      opponent: 'bot',
+      difficulty: 'chill',
+      onState: (snapshot) => (latest = snapshot),
+      onOver: (outcome) => (result = outcome),
+    });
+    match.start();
+
+    await runTurnBased(
+      match,
+      (snapshot) => {
+        const board = (snapshot.state as TicTacToeState).board;
+        const free = board.findIndex((cell) => cell === null);
+        return free < 0 ? null : { type: 'place', index: free };
+      },
+      () => latest,
+    );
+
+    expect(result).not.toBeNull();
+    expect((result as unknown as LocalResult).outcome.finished).toBe(true);
+    expect((result as unknown as LocalResult).moves).toBeGreaterThan(2);
+  });
+
+  it('never lets a brutal bot lose — the human just draws at best', async () => {
+    let latest: LocalSnapshot | null = null;
+    let result: LocalResult | null = null;
+
+    const match = new LocalMatch({
+      gameId: 'tic-tac-toe',
+      opponent: 'bot',
+      difficulty: 'brutal',
+      onState: (snapshot) => (latest = snapshot),
+      onOver: (outcome) => (result = outcome),
+    });
+    match.start();
+
+    await runTurnBased(
+      match,
+      (snapshot) => {
+        const board = (snapshot.state as TicTacToeState).board;
+        const free = board.findIndex((cell) => cell === null);
+        return free < 0 ? null : { type: 'place', index: free };
+      },
+      () => latest,
+    );
+
+    const outcome = (result as unknown as LocalResult).outcome;
+    expect(outcome.finished).toBe(true);
+    expect(outcome.winnerSeat).not.toBe(0);
+  });
+
+  it('hands control to whoever is to move in pass-and-play', () => {
+    let latest: LocalSnapshot | null = null;
+    const match = new LocalMatch({
+      gameId: 'tic-tac-toe',
+      opponent: 'human',
+      difficulty: 'sharp',
+      onState: (snapshot) => (latest = snapshot),
+      onOver: () => undefined,
+    });
+    match.start();
+
+    expect((latest as unknown as LocalSnapshot).controlledSeat).toBe(0);
+    expect(match.play({ type: 'place', index: 0 })).toBe(true);
+    expect((latest as unknown as LocalSnapshot).controlledSeat).toBe(1);
+
+    // No bot should ever move for the second player here.
+    vi.advanceTimersByTime(5_000);
+    expect(((latest as unknown as LocalSnapshot).state as TicTacToeState).moves).toBe(1);
+    match.destroy();
+  });
+
+  it('stops scheduling work once destroyed', () => {
+    let states = 0;
+    const match = new LocalMatch({
+      gameId: 'connect-four',
+      opponent: 'bot',
+      difficulty: 'sharp',
+      onState: () => (states += 1),
+      onOver: () => undefined,
+    });
+    match.start();
+    match.play({ type: 'drop', column: 0 });
+
+    const seen = states;
+    match.destroy();
+    vi.advanceTimersByTime(10_000);
+    expect(states).toBe(seen);
+  });
+
+  it('reports the winning line through to the caller', async () => {
+    let latest: LocalSnapshot | null = null;
+    let result: LocalResult | null = null;
+
+    const match = new LocalMatch({
+      gameId: 'tic-tac-toe',
+      opponent: 'human',
+      difficulty: 'sharp',
+      onState: (snapshot) => (latest = snapshot),
+      onOver: (outcome) => (result = outcome),
+    });
+    match.start();
+
+    // 0 -> 3 -> 1 -> 4 -> 2 wins the top row for seat 0.
+    for (const index of [0, 3, 1, 4, 2]) match.play({ type: 'place', index });
+
+    expect((result as unknown as LocalResult).outcome.winnerSeat).toBe(0);
+    expect(((latest as unknown as LocalSnapshot).state as TicTacToeState).winningLine).toEqual([0, 1, 2]);
+  });
+});
+
+describe('LocalMatch — realtime', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    let handle = 0;
+    // happy-dom has no rAF loop; drive it from timers so the sim can advance.
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      handle += 1;
+      setTimeout(() => callback(performance.now()), 16);
+      return handle;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('advances the simulation on its own and accepts steering input', async () => {
+    let latest: LocalSnapshot | null = null;
+    const match = new LocalMatch({
+      gameId: 'snake-duel',
+      opponent: 'bot',
+      difficulty: 'chill',
+      onState: (snapshot) => (latest = snapshot),
+      onOver: () => undefined,
+    });
+    match.start();
+
+    const before = ((latest as unknown as LocalSnapshot).state as SnakeState).steps;
+    match.input({ type: 'turn', dir: 'up' });
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    const after = ((latest as unknown as LocalSnapshot).state as SnakeState).steps;
+    expect(after).toBeGreaterThan(before);
+    match.destroy();
+  });
+
+  it('gives the local player continuous control in realtime games', () => {
+    let latest: LocalSnapshot | null = null;
+    const match = new LocalMatch({
+      gameId: 'pong',
+      opponent: 'bot',
+      difficulty: 'sharp',
+      onState: (snapshot) => (latest = snapshot),
+      onOver: () => undefined,
+    });
+    match.start();
+    expect((latest as unknown as LocalSnapshot).controlledSeat).toBe(0);
+    match.destroy();
+  });
+});
+
+describe('shared engine parity', () => {
+  it('uses the very same engine the server validates with', () => {
+    let latest: LocalSnapshot | null = null;
+    const match = new LocalMatch({
+      gameId: 'tic-tac-toe',
+      opponent: 'human',
+      difficulty: 'sharp',
+      onState: (snapshot) => (latest = snapshot),
+      onOver: () => undefined,
+    });
+    match.start();
+    match.play({ type: 'place', index: 4 });
+
+    const expected = ticTacToeEngine.apply(
+      ticTacToeEngine.createState(Date.now()),
+      0,
+      { type: 'place', index: 4 },
+      Date.now(),
+    ).state;
+
+    expect(((latest as unknown as LocalSnapshot).state as TicTacToeState).board).toEqual(expected.board);
+    match.destroy();
+  });
+});

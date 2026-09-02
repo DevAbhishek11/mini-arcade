@@ -26,7 +26,12 @@ export function QuestList({ limit }: { limit?: number }) {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
-                <span className={clsx('truncate text-sm font-medium', quest.completed ? 'text-neon-lime' : 'text-white')}>
+                <span
+                  className={clsx(
+                    'truncate text-sm font-medium',
+                    quest.completed ? 'text-neon-lime' : 'text-white',
+                  )}
+                >
                   {quest.def.description}
                 </span>
                 <span className="font-mono text-[0.7rem] tabular-nums text-slate-500">

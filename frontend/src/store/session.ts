@@ -8,6 +8,8 @@ export type ConnectionState = 'idle' | 'connecting' | 'online' | 'offline';
 interface SessionState {
   player: PlayerPublic | null;
   status: 'loading' | 'ready' | 'error';
+  /** `offline` means the API was unreachable — solo play still works. */
+  mode: 'online' | 'offline';
   connection: ConnectionState;
   workerId: number | null;
   latencyMs: number | null;
@@ -19,9 +21,14 @@ interface SessionState {
   setPlayer: (player: PlayerPublic) => void;
 }
 
+const isNetworkFailure = (error: unknown): boolean =>
+  error instanceof ApiRequestError &&
+  (error.status === 0 || error.code === 'NETWORK' || error.code === 'TIMEOUT');
+
 export const useSession = create<SessionState>((set, get) => ({
   player: null,
   status: 'loading',
+  mode: 'online',
   connection: 'idle',
   workerId: null,
   latencyMs: null,
@@ -31,11 +38,11 @@ export const useSession = create<SessionState>((set, get) => ({
     try {
       if (tokenStore.get()) {
         const { player } = await api.me();
-        set({ player, status: 'ready', error: null });
+        set({ player, status: 'ready', mode: 'online', error: null });
       } else {
         const { token, player } = await api.createGuest();
         tokenStore.set(token);
-        set({ player, status: 'ready', error: null });
+        set({ player, status: 'ready', mode: 'online', error: null });
       }
       wireSocket(set, get);
     } catch (error) {
@@ -43,10 +50,19 @@ export const useSession = create<SessionState>((set, get) => ({
         tokenStore.clear();
         const { token, player } = await api.createGuest();
         tokenStore.set(token);
-        set({ player, status: 'ready', error: null });
+        set({ player, status: 'ready', mode: 'online', error: null });
         wireSocket(set, get);
         return;
       }
+
+      // No server reachable: boot anyway in offline mode so the installed app
+      // still opens straight into solo play, and retry when the network is back.
+      if (isNetworkFailure(error) || !navigator.onLine) {
+        set({ status: 'ready', mode: 'offline', connection: 'offline', error: (error as Error).message });
+        window.addEventListener('online', () => void get().bootstrap(), { once: true });
+        return;
+      }
+
       set({ status: 'error', error: (error as Error).message });
     }
   },

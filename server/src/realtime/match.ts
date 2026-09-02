@@ -224,7 +224,11 @@ export class Match {
           .map(async (participant) => {
             const opponent = this.participants.find((p) => p.playerId !== participant.playerId);
             const result =
-              winnerSeat === null ? ('draw' as const) : winnerSeat === participant.seat ? ('win' as const) : ('loss' as const);
+              winnerSeat === null
+                ? ('draw' as const)
+                : winnerSeat === participant.seat
+                  ? ('win' as const)
+                  : ('loss' as const);
             try {
               summary.progress[participant.playerId] = await progressionService.recordMatch({
                 playerId: participant.playerId,

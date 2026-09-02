@@ -7,7 +7,9 @@ export function StreakFlame({ days, className }: { days: number; className?: str
     <span
       className={clsx(
         'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold tabular-nums',
-        hot ? 'border-neon-amber/30 bg-neon-amber/10 text-neon-amber' : 'border-white/10 bg-white/5 text-slate-400',
+        hot
+          ? 'border-neon-amber/30 bg-neon-amber/10 text-neon-amber'
+          : 'border-white/10 bg-white/5 text-slate-400',
         className,
       )}
       title={days > 0 ? `${days} day streak — play today to keep it` : 'Play a match to start a streak'}

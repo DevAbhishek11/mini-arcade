@@ -41,12 +41,14 @@ export const useToasts = create<ToastState>((set, get) => ({
 }));
 
 export const toast = {
-  info: (title: string, description?: string) => useToasts.getState().push({ tone: 'info', title, description }),
+  info: (title: string, description?: string) =>
+    useToasts.getState().push({ tone: 'info', title, description }),
   success: (title: string, description?: string) =>
     useToasts.getState().push({ tone: 'success', title, description }),
   warning: (title: string, description?: string) =>
     useToasts.getState().push({ tone: 'warning', title, description }),
-  error: (title: string, description?: string) => useToasts.getState().push({ tone: 'error', title, description }),
+  error: (title: string, description?: string) =>
+    useToasts.getState().push({ tone: 'error', title, description }),
   reward: (title: string, description?: string, icon?: string) =>
     useToasts.getState().push({ tone: 'reward', title, description, icon, ttlMs: 6000 }),
 };

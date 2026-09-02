@@ -155,7 +155,10 @@ export const snakeDuelEngine: GameEngine<SnakeState, SnakeAction> = {
 };
 
 function step(state: SnakeState): SnakeState {
-  const snakes = state.snakes.map((snake) => ({ ...snake, cells: snake.cells.slice() })) as SnakeState['snakes'];
+  const snakes = state.snakes.map((snake) => ({
+    ...snake,
+    cells: snake.cells.slice(),
+  })) as SnakeState['snakes'];
   let food = [...state.food];
   let rng = state.rng;
 
@@ -196,7 +199,9 @@ function step(state: SnakeState): SnakeState {
 
     const other = snakes[seat === 0 ? 1 : 0];
     const ownTail = snake.cells[snake.cells.length - 1];
-    const hitsSelf = snake.cells.some((cell, i) => cell === head && !(i === snake.cells.length - 1 && cell === ownTail));
+    const hitsSelf = snake.cells.some(
+      (cell, i) => cell === head && !(i === snake.cells.length - 1 && cell === ownTail),
+    );
     const hitsOther = other.cells.includes(head);
     if (hitsSelf || hitsOther) {
       snake.alive = false;

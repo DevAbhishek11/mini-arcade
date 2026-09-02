@@ -128,8 +128,12 @@ export function SnakeDuelCanvas({
   return (
     <div className="mx-auto w-full max-w-[32rem]">
       <div className="mb-3 flex items-center justify-between font-mono text-xs">
-        <span className="text-neon-cyan">you · {you.score} pellets{you.alive ? '' : ' · crashed'}</span>
-        <span className="text-neon-pink">rival · {them.score} pellets{them.alive ? '' : ' · crashed'}</span>
+        <span className="text-neon-cyan">
+          you · {you.score} pellets{you.alive ? '' : ' · crashed'}
+        </span>
+        <span className="text-neon-pink">
+          rival · {them.score} pellets{them.alive ? '' : ' · crashed'}
+        </span>
       </div>
 
       <canvas
@@ -152,7 +156,15 @@ export function SnakeDuelCanvas({
   );
 }
 
-function TouchButton({ dir, label, onTurn }: { dir: Direction; label: string; onTurn: (dir: Direction) => void }) {
+function TouchButton({
+  dir,
+  label,
+  onTurn,
+}: {
+  dir: Direction;
+  label: string;
+  onTurn: (dir: Direction) => void;
+}) {
   return (
     <button
       type="button"

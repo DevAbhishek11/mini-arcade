@@ -92,9 +92,10 @@ function toPublic(record: ProgressRecord, today = dayKey()): PlayerProgress {
   return {
     xp: record.xp,
     level: levelFromXp(record.xp),
-    dailyStreak: record.lastPlayedDay === today || record.lastPlayedDay === dayKey(new Date(Date.now() - 86_400_000))
-      ? record.dailyStreak
-      : 0,
+    dailyStreak:
+      record.lastPlayedDay === today || record.lastPlayedDay === dayKey(new Date(Date.now() - 86_400_000))
+        ? record.dailyStreak
+        : 0,
     longestStreak: record.longestStreak,
     lastPlayedDay: record.lastPlayedDay,
     matchesToday: record.lastPlayedDay === today ? record.matchesToday : 0,
@@ -218,7 +219,8 @@ export const progressionService = {
           increment = record.gamesToday.length > existing.progress ? 1 : 0;
           break;
         case 'win-realtime':
-          increment = input.result === 'win' && (input.gameId === 'pong' || input.gameId === 'snake-duel') ? 1 : 0;
+          increment =
+            input.result === 'win' && (input.gameId === 'pong' || input.gameId === 'snake-duel') ? 1 : 0;
           break;
         default:
           increment = 0;
@@ -234,7 +236,12 @@ export const progressionService = {
 
       record.quests = [
         ...record.quests.filter((q) => !(q.day === today && q.id === def.id)),
-        { ...existing, progress, completed: isComplete, claimedAt: isComplete ? new Date().toISOString() : null },
+        {
+          ...existing,
+          progress,
+          completed: isComplete,
+          claimedAt: isComplete ? new Date().toISOString() : null,
+        },
       ];
     }
 

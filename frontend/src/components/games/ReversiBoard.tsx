@@ -84,7 +84,9 @@ function Score({ label, value, tone }: { label: string; value: number; tone: 'li
       <span
         className={clsx(
           'size-5 rounded-full',
-          tone === 'light' ? 'bg-gradient-to-br from-slate-50 to-slate-400' : 'bg-gradient-to-br from-void-700 to-black ring-1 ring-white/15',
+          tone === 'light'
+            ? 'bg-gradient-to-br from-slate-50 to-slate-400'
+            : 'bg-gradient-to-br from-void-700 to-black ring-1 ring-white/15',
         )}
       />
       <span className="font-display text-xl font-bold tabular-nums text-white">{value}</span>

@@ -4,3 +4,4 @@ export * from './rating.js';
 export * from './progression.js';
 export * from './avatar.js';
 export * from './games/index.js';
+export * from './ai/bot.js';

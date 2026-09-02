@@ -228,7 +228,8 @@ class Matchmaker {
     if (participants.length === 1) {
       // Match the bot roughly to the waiting player's rating.
       const ticket = tickets[0] as Ticket;
-      const difficulty: BotDifficulty = ticket.rating >= 1400 ? 'brutal' : ticket.rating >= 1240 ? 'sharp' : 'chill';
+      const difficulty: BotDifficulty =
+        ticket.rating >= 1400 ? 'brutal' : ticket.rating >= 1240 ? 'sharp' : 'chill';
       participants.push({
         ...botIdentity(difficulty),
         avatar: 'nebula',

@@ -12,7 +12,12 @@ import { playerService } from '../domain/player-service.js';
 import { progressionService } from '../domain/progression-service.js';
 import type { Match } from './match.js';
 
-export type ArcadeSocket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
+export type ArcadeSocket = Socket<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  Record<string, never>,
+  SocketData
+>;
 export type ArcadeServer = IOServer<
   ClientToServerEvents,
   ServerToClientEvents,
