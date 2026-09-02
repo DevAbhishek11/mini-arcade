@@ -1,22 +1,33 @@
-import { useEffect, type ReactElement } from 'react';
+import { Suspense, lazy, useEffect, type ReactElement } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { UpdatePrompt } from '@/components/pwa/UpdatePrompt';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Toaster } from '@/components/ui/Toaster';
-import { AchievementsPage } from '@/pages/AchievementsPage';
-import { AuthPage } from '@/pages/AuthPage';
-import { LeaderboardPage } from '@/pages/LeaderboardPage';
 import { LobbyPage } from '@/pages/LobbyPage';
-import { NotFoundPage } from '@/pages/NotFoundPage';
-import { PlayPage } from '@/pages/PlayPage';
-import { SoloPage } from '@/pages/SoloPage';
-import { ProfilePage } from '@/pages/ProfilePage';
-import { SystemPage } from '@/pages/SystemPage';
 import { WelcomePage } from '@/pages/WelcomePage';
 import { useArcade } from '@/store/arcade';
 import { useProgression } from '@/store/progression';
 import { useSession } from '@/store/session';
+
+/**
+ * Everything except the two landing pages is code split. The first paint only
+ * has to download the shell plus whichever page you actually asked for, and
+ * the game boards ride along with the pages that use them.
+ */
+const AuthPage = lazy(() => import('@/pages/AuthPage').then((m) => ({ default: m.AuthPage })));
+const PlayPage = lazy(() => import('@/pages/PlayPage').then((m) => ({ default: m.PlayPage })));
+const SoloPage = lazy(() => import('@/pages/SoloPage').then((m) => ({ default: m.SoloPage })));
+const LeaderboardPage = lazy(() =>
+  import('@/pages/LeaderboardPage').then((m) => ({ default: m.LeaderboardPage })),
+);
+const AchievementsPage = lazy(() =>
+  import('@/pages/AchievementsPage').then((m) => ({ default: m.AchievementsPage })),
+);
+const ProfilePage = lazy(() => import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
+const SystemPage = lazy(() => import('@/pages/SystemPage').then((m) => ({ default: m.SystemPage })));
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 function BootScreen({ error }: { error: string | null }) {
   return (
@@ -39,6 +50,21 @@ function BootScreen({ error }: { error: string | null }) {
         ) : (
           <p className="mt-6 animate-pulse text-sm text-slate-500">Inserting coin…</p>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Shown for the few hundred milliseconds a split route takes to arrive. */
+function RouteFallback() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-9 w-52" />
+      <Skeleton className="h-64 w-full" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
       </div>
     </div>
   );
@@ -96,7 +122,9 @@ export default function App() {
           path="/login"
           element={
             <RedirectIfSignedIn>
-              <AuthPage mode="login" />
+              <Suspense fallback={<BootScreen error={null} />}>
+                <AuthPage mode="login" />
+              </Suspense>
             </RedirectIfSignedIn>
           }
         />
@@ -104,7 +132,9 @@ export default function App() {
           path="/signup"
           element={
             <RedirectIfSignedIn>
-              <AuthPage mode="signup" />
+              <Suspense fallback={<BootScreen error={null} />}>
+                <AuthPage mode="signup" />
+              </Suspense>
             </RedirectIfSignedIn>
           }
         />
@@ -113,41 +143,43 @@ export default function App() {
           path="*"
           element={
             <AppShell>
-              <Routes>
-                {/* Signed in players land straight in the arcade; visitors get the pitch. */}
-                <Route path="/" element={status === 'ready' ? <LobbyPage /> : <WelcomePage />} />
-                <Route
-                  path="/play/:gameId"
-                  element={
-                    <RequireSession>
-                      <PlayPage />
-                    </RequireSession>
-                  }
-                />
-                {/* Solo runs entirely in the browser — no identity required. */}
-                <Route path="/solo/:gameId" element={<SoloPage />} />
-                <Route path="/leaderboard" element={<LeaderboardPage />} />
-                <Route
-                  path="/achievements"
-                  element={
-                    <RequireSession>
-                      <AchievementsPage />
-                    </RequireSession>
-                  }
-                />
-                <Route
-                  path="/profile"
-                  element={
-                    <RequireSession>
-                      <ProfilePage />
-                    </RequireSession>
-                  }
-                />
-                <Route path="/system" element={<SystemPage />} />
-                <Route path="/play" element={<Navigate to="/" replace />} />
-                <Route path="/solo" element={<Navigate to="/solo/tic-tac-toe" replace />} />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
+              <Suspense fallback={<RouteFallback />}>
+                <Routes>
+                  {/* Signed in players land straight in the arcade; visitors get the pitch. */}
+                  <Route path="/" element={status === 'ready' ? <LobbyPage /> : <WelcomePage />} />
+                  <Route
+                    path="/play/:gameId"
+                    element={
+                      <RequireSession>
+                        <PlayPage />
+                      </RequireSession>
+                    }
+                  />
+                  {/* Solo runs entirely in the browser — no identity required. */}
+                  <Route path="/solo/:gameId" element={<SoloPage />} />
+                  <Route path="/leaderboard" element={<LeaderboardPage />} />
+                  <Route
+                    path="/achievements"
+                    element={
+                      <RequireSession>
+                        <AchievementsPage />
+                      </RequireSession>
+                    }
+                  />
+                  <Route
+                    path="/profile"
+                    element={
+                      <RequireSession>
+                        <ProfilePage />
+                      </RequireSession>
+                    }
+                  />
+                  <Route path="/system" element={<SystemPage />} />
+                  <Route path="/play" element={<Navigate to="/" replace />} />
+                  <Route path="/solo" element={<Navigate to="/solo/tic-tac-toe" replace />} />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </Suspense>
             </AppShell>
           }
         />

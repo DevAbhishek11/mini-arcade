@@ -257,7 +257,7 @@ handy for demos, useless for persistence.
 ## 9. Testing, linting and type checking
 
 ```bash
-npm test              # every workspace: 141 tests
+npm test              # every workspace: 180 tests
 npm run test:server   # server + shared engines, AI, progression, rooms, cache, API
 npm run test:web      # browser-env tests: offline match runner, solo stats, session
 npm run typecheck     # tsc --noEmit everywhere

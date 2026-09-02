@@ -52,8 +52,16 @@ async function mountAt(path: string) {
   await act(async () => {
     root.render(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(App)));
   });
+  // Routes are code split, so give React a few turns to resolve the lazy
+  // chunk and run the effects that follow it.
+  for (let i = 0; i < 20; i += 1) {
+    if (!(container.textContent ?? '').includes('Inserting coin')) break;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+  }
   await act(async () => {
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
   return container.textContent ?? '';
 }

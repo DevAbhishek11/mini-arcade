@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ticTacToeEngine, type SnakeState, type TicTacToeState } from '@mini-arcade/shared';
+import { GAME_LIST, ticTacToeEngine, type SnakeState, type TicTacToeState } from '@mini-arcade/shared';
 import { LocalMatch, type LocalResult, type LocalSnapshot } from '@/lib/local-match';
 
 /** Drains the bot's think-timeouts until the match reports a result. */
@@ -248,4 +248,82 @@ describe('shared engine parity', () => {
     expect(((latest as unknown as LocalSnapshot).state as TicTacToeState).board).toEqual(expected.board);
     match.destroy();
   });
+});
+
+describe('LocalMatch — every cabinet plays offline', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  // Realtime games are driven by an animation loop and covered separately.
+  const turnBased = GAME_LIST.filter((game) => game.tickRate === 0).map((game) => game.id);
+
+  it.each(turnBased)(
+    'bot vs bot reaches a result in %s',
+    async (gameId) => {
+      let result: LocalResult | null = null;
+      let latest: LocalSnapshot | null = null;
+
+      const match = new LocalMatch({
+        gameId,
+        opponent: 'bot',
+        difficulty: 'chill',
+        onState: (snapshot) => {
+          latest = snapshot;
+        },
+        onOver: (over) => {
+          result = over;
+        },
+      });
+      match.start();
+
+      // Play the human seat with the engine's own legal moves, whatever they are.
+      await runTurnBased(
+        match,
+        (snapshot) => {
+          const state = snapshot.state as {
+            legal?: unknown[];
+            board?: (number | null)[];
+            edges?: boolean[];
+            columns?: unknown[];
+          };
+
+          // Newer engines publish their legal moves; older ones are simple
+          // enough to read straight off the board.
+          const legal =
+            state.legal ??
+            (gameId === 'dots-and-boxes'
+              ? (state.edges ?? []).flatMap((drawn, index) => (drawn ? [] : [index]))
+              : gameId === 'connect-four'
+                ? (state.board ?? []).flatMap((_, index) =>
+                    index < 7 && state.board?.[index] === null ? [index] : [],
+                  )
+                : (state.board ?? []).flatMap((cell, index) => (cell === null ? [index] : [])));
+
+          if (legal.length === 0) return null;
+          const choice = legal[0];
+
+          switch (gameId) {
+            case 'checkers': {
+              const move = choice as { from: number; to: number };
+              return { type: 'move', from: move.from, to: move.to };
+            }
+            case 'mancala':
+              return { type: 'sow', pit: choice as number };
+            case 'connect-four':
+              return { type: 'drop', column: choice as number };
+            case 'dots-and-boxes':
+              return { type: 'draw', edge: choice as number };
+            default:
+              return { type: 'place', index: choice as number };
+          }
+        },
+        () => latest,
+      );
+
+      expect(match.isFinished, `${gameId} never finished`).toBe(true);
+      expect(result).not.toBeNull();
+      match.destroy();
+    },
+    20_000,
+  );
 });

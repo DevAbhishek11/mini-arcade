@@ -1,23 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GAME_LIST, type ArcadeStats, type GameId } from '@mini-arcade/shared';
+import { GAME_LIST, type ArcadeStats } from '@mini-arcade/shared';
 import { HeroDemo } from '@/components/HeroDemo';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { gameArt } from '@/lib/art';
 import { api } from '@/lib/api';
 import { useSession } from '@/store/session';
 import { toast } from '@/store/toast';
-
-const ART: Record<GameId, string> = {
-  'tic-tac-toe': '/art/tic-tac-toe.webp',
-  'connect-four': '/art/connect-four.webp',
-  gomoku: '/art/gomoku.webp',
-  reversi: '/art/reversi.webp',
-  'dots-and-boxes': '/art/dots-and-boxes.webp',
-  pong: '/art/pong.webp',
-  'snake-duel': '/art/snake-duel.webp',
-};
 
 const REASONS = [
   {
@@ -146,7 +137,7 @@ export function WelcomePage() {
             >
               <div className="relative h-32 overflow-hidden">
                 <img
-                  src={ART[game.id]}
+                  src={gameArt(game.id)}
                   alt=""
                   loading="lazy"
                   className="size-full object-cover transition-transform duration-500 group-hover:scale-105"

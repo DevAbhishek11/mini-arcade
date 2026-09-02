@@ -1,13 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
-import {
-  GAME_LIST,
-  type ArcadeStats,
-  type GameCatalogEntry,
-  type GameId,
-  type GameMode,
-} from '@mini-arcade/shared';
+import { GAME_LIST, type ArcadeStats, type GameCatalogEntry, type GameMode } from '@mini-arcade/shared';
 import { HeroDemo } from '@/components/HeroDemo';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 import { QuestList } from '@/components/progress/QuestList';
@@ -17,6 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardLabel } from '@/components/ui/Card';
 import { Stat } from '@/components/ui/Stat';
+import { gameArt } from '@/lib/art';
 import { api } from '@/lib/api';
 import { useOnline } from '@/lib/online';
 import { sound } from '@/lib/sound';
@@ -24,16 +19,6 @@ import { soloStats } from '@/lib/solo-stats';
 import { useArcade } from '@/store/arcade';
 import { useProgression } from '@/store/progression';
 import { toast } from '@/store/toast';
-
-const ART: Record<GameId, string> = {
-  'tic-tac-toe': '/art/tic-tac-toe.webp',
-  'connect-four': '/art/connect-four.webp',
-  gomoku: '/art/gomoku.webp',
-  reversi: '/art/reversi.webp',
-  'dots-and-boxes': '/art/dots-and-boxes.webp',
-  pong: '/art/pong.webp',
-  'snake-duel': '/art/snake-duel.webp',
-};
 
 type Filter = 'all' | GameMode | 'quick';
 
@@ -342,7 +327,7 @@ export function LobbyPage() {
               <Link to={`/play/${game.id}`} className="block">
                 <div className="relative aspect-[16/10] overflow-hidden">
                   <img
-                    src={ART[game.id]}
+                    src={gameArt(game.id)}
                     alt={`${game.name} artwork`}
                     loading="lazy"
                     width={640}

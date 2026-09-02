@@ -1,6 +1,6 @@
 # Mini Arcade
 
-A realtime, multiplayer arcade built as a production-shaped TypeScript monorepo. **Seven games**, matchmaking
+A realtime, multiplayer arcade built as a production-shaped TypeScript monorepo. **Eleven games**, matchmaking
 by rating in seconds, private rooms for friends, bots with three difficulties, and a full progression layer
 (XP, levels, daily streaks, quests and achievements). Every game is **server-authoritative** over websockets —
 the browser only renders and predicts, the server decides. It is also an installable PWA that keeps working
@@ -43,7 +43,7 @@ nginx  ──sticky──▶  api replicas  ──▶  Postgres (durable state)
 
 | Area        | Highlights                                                                                      |
 | ----------- | ----------------------------------------------------------------------------------------------- |
-| Games       | 7 cabinets: Tic Tac Toe, Connect Four, Gomoku, Reversi, Dots & Boxes, Neon Pong, Snake Duel     |
+| Games       | 11 cabinets, from 60-second Tic Tac Toe to Hex, Checkers, Mancala and Ultimate Tic Tac Toe      |
 | Play modes  | Ranked quick match, unrated practice vs bots (3 difficulties), private rooms with a 5-char code |
 | Progression | XP & levels, daily streaks, 3 rotating daily quests, 12 achievements, per-match reward summary  |
 | Social      | Per-match chat, 8 emotes with sound, one-tap rematch with swapped seats, shareable invite links |
@@ -55,10 +55,10 @@ nginx  ──sticky──▶  api replicas  ──▶  Postgres (durable state)
 | Hardening   | zod-validated env & requests, helmet, CORS, distributed rate limits, request timeouts           |
 | Ops         | `/api/system` health, `/api/system/ready` readiness, Prometheus `/metrics`, structured logs     |
 | Solo play   | If nobody is queued, a bot opponent joins — its strength is matched to your rating              |
-| Offline     | Installable PWA: all 7 games playable vs the bot or pass-and-play with no network at all        |
+| Offline     | Installable PWA: all 11 games playable vs the bot or pass-and-play with no network at all       |
 
-Seven engines, one implementation each: every game is a pure, immutable reducer in `@mini-arcade/shared`, so
-the server validates with the exact code the browser renders with.
+Eleven engines, one implementation each: every game is a pure, immutable reducer in `@mini-arcade/shared`,
+so the server validates with the exact code the browser renders with.
 
 ---
 
@@ -73,6 +73,15 @@ the server validates with the exact code the browser renders with.
 | Dots & Boxes | turn based | 5×5 boxes        | Closing a box scores **and** grants another move             |
 | Neon Pong    | realtime   | 30 Hz simulation | Client-side extrapolation between packets                    |
 | Snake Duel   | realtime   | 21×21, 120 ms    | Deterministic LCG food spawns so every client agrees         |
+
+### Deep cuts
+
+| Game                 | Mode       | Board         | Notes                                                                    |
+| -------------------- | ---------- | ------------- | ------------------------------------------------------------------------ |
+| Ultimate Tic Tac Toe | turn based | 9 × 3×3       | Your move picks the board your opponent must play in                     |
+| Checkers             | turn based | 8×8           | Captures are compulsory, multi-jumps chain, kings crown on the back rank |
+| Mancala              | turn based | Kalah 6×4     | Land in your store to move again; land in an empty pit to capture        |
+| Hex                  | turn based | 11×11 rhombus | Connect your two edges — Hex cannot be drawn — with the swap rule        |
 
 Each cabinet ships with a _how to play_ sheet, a difficulty rating and an expected match length, and the
 lobby can be filtered by mode or by "under 3 minutes".
@@ -251,6 +260,25 @@ get(key) ─▶ L1 LRU (per process, 5 s TTL) ──hit──▶ value
   database.
 - **Bounded** — L1 is an LRU capped at `CACHE_L1_MAX_ITEMS`; Redis runs `allkeys-lru` with a memory ceiling.
 - Match completion invalidates the affected players, the leaderboards and the global stats in one call.
+- **Immutable payloads** — the game catalogue and the achievement/quest definitions are serialised once at
+  boot and served behind a strong ETag (`staticJson`), so repeat visits cost a 304 with an empty body and no
+  `JSON.stringify` per request.
+
+### Frontend delivery
+
+- **Route level code splitting** — every page past the landing screens is a `React.lazy` chunk, so the first
+  paint downloads the shell and nothing else. The eleven game boards ride in a shared chunk that only loads
+  when you actually open a match.
+- **Artwork** — cabinet art is WebP at ~15–40 kB each, resolved by convention from the game id
+  (`/art/<game-id>.webp`), and precached by the service worker.
+- **Skeletons, not spinners** — a suspended route renders the shape of the page it is about to become.
+
+| Bundle (gzip)         | Size     |
+| --------------------- | -------- |
+| React runtime         | ~54 kB   |
+| App shell + router    | ~24 kB   |
+| Any single page       | 0.4–7 kB |
+| Game boards (on play) | ~13 kB   |
 
 ---
 
@@ -379,7 +407,7 @@ frontend/
 ```bash
 npm run lint        # eslint (typescript-eslint, flat config)
 npm run typecheck   # tsc --noEmit across all workspaces
-npm test            # vitest — 141 tests across server and web
+npm test            # vitest — 180 tests across server and web
 npm run build       # shared → server → frontend
 ```
 

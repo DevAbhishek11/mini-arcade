@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ACHIEVEMENT_LIST, QUEST_LIST } from '@mini-arcade/shared';
 import { progressionService, questsForDay } from '../../domain/progression-service.js';
 import { asyncHandler } from '../middleware/async-handler.js';
+import { staticJson } from '../static-json.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 
@@ -17,13 +18,7 @@ progressRouter.get(
   }),
 );
 
-progressRouter.get(
-  '/catalog',
-  asyncHandler(async (_req, res) => {
-    res.setHeader('cache-control', 'public, max-age=3600');
-    res.json({ achievements: ACHIEVEMENT_LIST, quests: QUEST_LIST });
-  }),
-);
+progressRouter.get('/catalog', staticJson({ achievements: ACHIEVEMENT_LIST, quests: QUEST_LIST }, 3600));
 
 progressRouter.get(
   '/quests/today',

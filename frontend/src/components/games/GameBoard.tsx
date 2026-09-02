@@ -1,21 +1,29 @@
 import type {
+  CheckersState,
   ConnectFourState,
   DotsState,
   GameId,
   GomokuState,
+  HexState,
+  MancalaState,
   PongState,
   ReversiState,
   Seat,
   SnakeState,
   TicTacToeState,
+  UltimateTicTacToeState,
 } from '@mini-arcade/shared';
+import { CheckersBoard } from './CheckersBoard';
 import { ConnectFourBoard } from './ConnectFourBoard';
 import { DotsAndBoxesBoard } from './DotsAndBoxesBoard';
 import { GomokuBoard } from './GomokuBoard';
+import { HexBoard } from './HexBoard';
+import { MancalaBoard } from './MancalaBoard';
 import { PongCanvas } from './PongCanvas';
 import { ReversiBoard } from './ReversiBoard';
 import { SnakeDuelCanvas } from './SnakeDuelCanvas';
 import { TicTacToeBoard } from './TicTacToeBoard';
+import { UltimateTicTacToeBoard } from './UltimateTicTacToeBoard';
 
 interface Props {
   gameId: GameId;
@@ -89,6 +97,43 @@ export function GameBoard({ gameId, state, seat, yourTurn, onAction }: Props) {
           state={state as SnakeState}
           seat={seat}
           onTurn={(dir) => onAction({ type: 'turn', dir })}
+        />
+      );
+    case 'ultimate-tic-tac-toe':
+      return (
+        <UltimateTicTacToeBoard
+          state={state as UltimateTicTacToeState}
+          seat={seat}
+          yourTurn={yourTurn}
+          onPlay={(index) => onAction({ type: 'place', index })}
+        />
+      );
+    case 'checkers':
+      return (
+        <CheckersBoard
+          state={state as CheckersState}
+          seat={seat}
+          yourTurn={yourTurn}
+          onPlay={(from, to) => onAction({ type: 'move', from, to })}
+        />
+      );
+    case 'mancala':
+      return (
+        <MancalaBoard
+          state={state as MancalaState}
+          seat={seat}
+          yourTurn={yourTurn}
+          onPlay={(pit) => onAction({ type: 'sow', pit })}
+        />
+      );
+    case 'hex':
+      return (
+        <HexBoard
+          state={state as HexState}
+          seat={seat}
+          yourTurn={yourTurn}
+          onPlay={(index) => onAction({ type: 'place', index })}
+          onSwap={() => onAction({ type: 'swap' })}
         />
       );
     default:

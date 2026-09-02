@@ -16,13 +16,27 @@ import {
   REVERSI_SIZE,
   SNAKE_GRID,
   TOTAL_EDGES,
+  checkersEngine,
+  checkersLegalMoves,
   connectFourEngine,
+  hexNeighbours,
+  hexLegalMoves,
   legalMoves,
+  mancalaEngine,
+  mancalaLegalMoves,
+  mancalaPitsOf,
+  ultimateTicTacToeEngine,
+  utttLegalMoves,
   reversiEngine,
   ticTacToeEngine,
   toXY,
+  type CheckersMove,
+  type CheckersState,
   type ConnectFourState,
   type Direction,
+  type HexState,
+  type MancalaState,
+  type UltimateTicTacToeState,
   type DotsState,
   type GomokuState,
   type PongState,
@@ -408,10 +422,360 @@ const DEFAULT_DIFFICULTY: Record<GameId, BotDifficulty> = {
   'dots-and-boxes': 'sharp',
   pong: 'chill',
   'snake-duel': 'sharp',
+  'ultimate-tic-tac-toe': 'sharp',
+  checkers: 'sharp',
+  mancala: 'sharp',
+  hex: 'sharp',
 };
 
 const thinkTime = (difficulty: BotDifficulty) =>
   (difficulty === 'brutal' ? 350 : 500) + randomInt(difficulty === 'chill' ? 1100 : 700);
+
+/* ── Ultimate Tic Tac Toe ───────────────────────────────────────────────── */
+
+const UTTT_CELL_WEIGHT = [3, 2, 3, 2, 4, 2, 3, 2, 3];
+
+/** Small board score from the mover's point of view. */
+function utttSmallScore(cells: (Seat | null)[], base: number, seat: Seat): number {
+  let score = 0;
+  for (const [a, b, c] of TTT_LINES) {
+    let mine = 0;
+    let theirs = 0;
+    for (const offset of [a, b, c]) {
+      const value = cells[base + offset];
+      if (value === seat) mine += 1;
+      else if (value !== null && value !== undefined) theirs += 1;
+    }
+    if (mine > 0 && theirs > 0) continue;
+    if (mine === 2) score += 6;
+    else if (mine === 1) score += 1;
+    else if (theirs === 2) score -= 7;
+    else if (theirs === 1) score -= 1;
+  }
+  return score;
+}
+
+function utttEvaluate(state: UltimateTicTacToeState, seat: Seat): number {
+  let score = 0;
+
+  state.boards.forEach((result, board) => {
+    if (result === seat) score += 45 * UTTT_CELL_WEIGHT[board]!;
+    else if (result !== null && result !== 'draw') score -= 45 * UTTT_CELL_WEIGHT[board]!;
+    else if (result === null) score += utttSmallScore(state.cells, board * 9, seat);
+  });
+
+  // Big board threats matter more than any single small board.
+  for (const [a, b, c] of TTT_LINES) {
+    let mine = 0;
+    let theirs = 0;
+    for (const board of [a, b, c]) {
+      const result = state.boards[board];
+      if (result === seat) mine += 1;
+      else if (result !== null && result !== 'draw') theirs += 1;
+    }
+    if (mine > 0 && theirs > 0) continue;
+    if (mine === 2) score += 120;
+    else if (theirs === 2) score -= 140;
+  }
+
+  // Sending the opponent to a free choice is a real concession.
+  if (state.activeBoard === null && state.turn !== seat) score -= 15;
+  return score;
+}
+
+function utttMove(state: UltimateTicTacToeState, seat: Seat, difficulty: BotDifficulty): number {
+  const moves = utttLegalMoves(state);
+  if (moves.length === 0) return -1;
+  if (Math.random() < blunderChance[difficulty]) return moves[randomInt(moves.length)] as number;
+
+  // Depth 2 for sharp, 3 for brutal — the branching factor here is brutal too.
+  const depth = difficulty === 'brutal' ? 3 : 2;
+  let best = moves[0] as number;
+  let bestScore = -Infinity;
+
+  for (const index of moves) {
+    const result = ultimateTicTacToeEngine.apply(state, seat, { type: 'place', index }, Date.now());
+    if (!result.ok) continue;
+    const score = utttSearch(result.state, seat, depth - 1, -Infinity, Infinity);
+    if (score > bestScore) {
+      bestScore = score;
+      best = index;
+    }
+  }
+  return best;
+}
+
+function utttSearch(
+  state: UltimateTicTacToeState,
+  seat: Seat,
+  depth: number,
+  alpha: number,
+  beta: number,
+): number {
+  const outcome = ultimateTicTacToeEngine.outcome(state);
+  if (outcome.finished) {
+    if (outcome.winnerSeat === seat) return 100_000;
+    if (outcome.winnerSeat === null) return 0;
+    return -100_000;
+  }
+  if (depth <= 0) return utttEvaluate(state, seat);
+
+  const maximising = state.turn === seat;
+  let value = maximising ? -Infinity : Infinity;
+  let localAlpha = alpha;
+  let localBeta = beta;
+
+  // Cap the branching factor: the engine is pure, so ordering is cheap.
+  const moves = utttLegalMoves(state).slice(0, 24);
+  for (const index of moves) {
+    const result = ultimateTicTacToeEngine.apply(state, state.turn, { type: 'place', index }, Date.now());
+    if (!result.ok) continue;
+    const score = utttSearch(result.state, seat, depth - 1, localAlpha, localBeta);
+
+    if (maximising) {
+      value = Math.max(value, score);
+      localAlpha = Math.max(localAlpha, value);
+    } else {
+      value = Math.min(value, score);
+      localBeta = Math.min(localBeta, value);
+    }
+    if (localBeta <= localAlpha) break;
+  }
+  return value;
+}
+
+/* ── Checkers ───────────────────────────────────────────────────────────── */
+
+function checkersEvaluate(state: CheckersState, seat: Seat): number {
+  let score = 0;
+  state.board.forEach((piece, index) => {
+    if (!piece) return;
+    const sign = piece.seat === seat ? 1 : -1;
+    // Kings are worth roughly 1.6 men; advanced men are worth more than home ones.
+    const advance = piece.seat === 0 ? 7 - Math.floor(index / 8) : Math.floor(index / 8);
+    score += sign * (piece.king ? 165 : 100 + advance * 4);
+    // Edge squares can never be captured.
+    if (index % 8 === 0 || index % 8 === 7) score += sign * 6;
+  });
+  return score;
+}
+
+function checkersSearch(state: CheckersState, seat: Seat, depth: number, alpha: number, beta: number): number {
+  const outcome = checkersEngine.outcome(state);
+  if (outcome.finished) {
+    if (outcome.winnerSeat === seat) return 100_000;
+    if (outcome.winnerSeat === null) return 0;
+    return -100_000;
+  }
+  if (depth <= 0) return checkersEvaluate(state, seat);
+
+  const maximising = state.turn === seat;
+  let value = maximising ? -Infinity : Infinity;
+  let localAlpha = alpha;
+  let localBeta = beta;
+
+  for (const move of checkersLegalMoves(state)) {
+    const result = checkersEngine.apply(
+      state,
+      state.turn,
+      { type: 'move', from: move.from, to: move.to },
+      Date.now(),
+    );
+    if (!result.ok) continue;
+    const score = checkersSearch(result.state, seat, depth - 1, localAlpha, localBeta);
+
+    if (maximising) {
+      value = Math.max(value, score);
+      localAlpha = Math.max(localAlpha, value);
+    } else {
+      value = Math.min(value, score);
+      localBeta = Math.min(localBeta, value);
+    }
+    if (localBeta <= localAlpha) break;
+  }
+  return value;
+}
+
+function checkersMove(state: CheckersState, seat: Seat, difficulty: BotDifficulty): CheckersMove | null {
+  const moves = checkersLegalMoves(state);
+  if (moves.length === 0) return null;
+  if (Math.random() < blunderChance[difficulty]) return moves[randomInt(moves.length)] as CheckersMove;
+
+  const depth = difficulty === 'brutal' ? 5 : 3;
+  let best = moves[0] as CheckersMove;
+  let bestScore = -Infinity;
+
+  for (const move of moves) {
+    const result = checkersEngine.apply(
+      state,
+      seat,
+      { type: 'move', from: move.from, to: move.to },
+      Date.now(),
+    );
+    if (!result.ok) continue;
+    // A chained jump keeps the turn, so the same seat maximises again.
+    const score = checkersSearch(result.state, seat, depth - 1, -Infinity, Infinity);
+    if (score > bestScore) {
+      bestScore = score;
+      best = move;
+    }
+  }
+  return best;
+}
+
+/* ── Mancala ────────────────────────────────────────────────────────────── */
+
+function mancalaEvaluate(state: MancalaState, seat: Seat): number {
+  const store = seat === 0 ? 6 : 13;
+  const otherStore = seat === 0 ? 13 : 6;
+  let score = (state.pits[store] ?? 0) - (state.pits[otherStore] ?? 0);
+  // Stones on your own side are still yours to sow.
+  for (const pit of mancalaPitsOf(seat)) score += (state.pits[pit] ?? 0) * 0.35;
+  for (const pit of mancalaPitsOf(seat === 0 ? 1 : 0)) score -= (state.pits[pit] ?? 0) * 0.35;
+  return score * 10;
+}
+
+function mancalaSearch(state: MancalaState, seat: Seat, depth: number, alpha: number, beta: number): number {
+  const outcome = mancalaEngine.outcome(state);
+  if (outcome.finished) {
+    if (outcome.winnerSeat === seat) return 100_000;
+    if (outcome.winnerSeat === null) return 0;
+    return -100_000;
+  }
+  if (depth <= 0) return mancalaEvaluate(state, seat);
+
+  const maximising = state.turn === seat;
+  let value = maximising ? -Infinity : Infinity;
+  let localAlpha = alpha;
+  let localBeta = beta;
+
+  for (const pit of mancalaLegalMoves(state)) {
+    const result = mancalaEngine.apply(state, state.turn, { type: 'sow', pit }, Date.now());
+    if (!result.ok) continue;
+    const score = mancalaSearch(result.state, seat, depth - 1, localAlpha, localBeta);
+
+    if (maximising) {
+      value = Math.max(value, score);
+      localAlpha = Math.max(localAlpha, value);
+    } else {
+      value = Math.min(value, score);
+      localBeta = Math.min(localBeta, value);
+    }
+    if (localBeta <= localAlpha) break;
+  }
+  return value;
+}
+
+function mancalaMove(state: MancalaState, seat: Seat, difficulty: BotDifficulty): number {
+  const moves = mancalaLegalMoves(state);
+  if (moves.length === 0) return -1;
+  if (Math.random() < blunderChance[difficulty]) return moves[randomInt(moves.length)] as number;
+
+  // Only 6 branches a ply, so we can afford to look a long way ahead.
+  const depth = difficulty === 'brutal' ? 8 : 5;
+  let best = moves[0] as number;
+  let bestScore = -Infinity;
+
+  for (const pit of moves) {
+    const result = mancalaEngine.apply(state, seat, { type: 'sow', pit }, Date.now());
+    if (!result.ok) continue;
+    const score = mancalaSearch(result.state, seat, depth - 1, -Infinity, Infinity);
+    if (score > bestScore) {
+      bestScore = score;
+      best = pit;
+    }
+  }
+  return best;
+}
+
+/* ── Hex ────────────────────────────────────────────────────────────────── */
+
+/**
+ * Hex is a connection game, so the bot plays a shortest-path heuristic: it
+ * scores each empty cell by how much it shortens its own crossing while
+ * lengthening the opponent's. Dijkstra over cell costs (own stone 0, empty 1,
+ * enemy stone impassable) gives a strong, cheap evaluation.
+ */
+function hexDistance(board: (Seat | null)[], seat: Seat, size: number): number {
+  const cost = new Array<number>(board.length).fill(Infinity);
+  const queue: number[] = [];
+
+  const isStart = (index: number) => (seat === 0 ? Math.floor(index / size) === 0 : index % size === 0);
+  const isEnd = (index: number) =>
+    seat === 0 ? Math.floor(index / size) === size - 1 : index % size === size - 1;
+
+  for (let index = 0; index < board.length; index += 1) {
+    const owner = board[index];
+    if (owner !== null && owner !== seat) continue;
+    if (!isStart(index)) continue;
+    cost[index] = owner === seat ? 0 : 1;
+    queue.push(index);
+  }
+
+  // Small board and tiny weights (0 or 1), so a simple relaxing queue beats a heap.
+  while (queue.length > 0) {
+    let bestAt = 0;
+    for (let i = 1; i < queue.length; i += 1) {
+      if ((cost[queue[i] as number] as number) < (cost[queue[bestAt] as number] as number)) bestAt = i;
+    }
+    const current = queue.splice(bestAt, 1)[0] as number;
+
+    for (const next of hexNeighbours(current)) {
+      const owner = board[next];
+      if (owner !== null && owner !== seat) continue;
+      const step = owner === seat ? 0 : 1;
+      const candidate = (cost[current] as number) + step;
+      if (candidate < (cost[next] as number)) {
+        cost[next] = candidate;
+        queue.push(next);
+      }
+    }
+  }
+
+  let best = Infinity;
+  for (let index = 0; index < board.length; index += 1) {
+    if (isEnd(index) && (cost[index] as number) < best) best = cost[index] as number;
+  }
+  return best;
+}
+
+function hexMove(state: HexState, seat: Seat, difficulty: BotDifficulty): number {
+  const moves = hexLegalMoves(state);
+  if (moves.length === 0) return -1;
+  if (Math.random() < blunderChance[difficulty]) return moves[randomInt(moves.length)] as number;
+
+  const size = Math.round(Math.sqrt(state.board.length));
+  const opponent = seat === 0 ? 1 : 0;
+
+  // Opening: the centre is the strongest single cell on an empty board.
+  if (state.moves === 0) return Math.floor(state.board.length / 2);
+
+  // Only consider cells near existing stones — the rest are provably slow.
+  const candidates = moves.filter((index) =>
+    hexNeighbours(index).some((neighbour) => state.board[neighbour] !== null),
+  );
+  const pool = (candidates.length > 0 ? candidates : moves).slice(0, difficulty === 'brutal' ? 48 : 24);
+
+  let best = pool[0] as number;
+  let bestScore = -Infinity;
+
+  for (const index of pool) {
+    const board = state.board.slice();
+    board[index] = seat;
+
+    const mine = hexDistance(board, seat, size);
+    if (mine === 0) return index;
+    const theirs = hexDistance(board, opponent, size);
+
+    // Chase your own connection, but block a nearly finished opponent first.
+    const score = theirs * 1.05 - mine * 1.35;
+    if (score > bestScore) {
+      bestScore = score;
+      best = index;
+    }
+  }
+  return best;
+}
 
 export function decide(
   gameId: GameId,
@@ -474,6 +838,32 @@ export function decide(
       const dir = snakeMove(typed, seat, difficulty);
       if (!dir || dir === typed.snakes[seat].dir) return null;
       return { action: { type: 'turn', dir }, delayMs: 0 };
+    }
+    case 'ultimate-tic-tac-toe': {
+      const typed = state as UltimateTicTacToeState;
+      if (typed.turn !== seat) return null;
+      const index = utttMove(typed, seat, difficulty);
+      return index < 0 ? null : { action: { type: 'place', index }, delayMs: thinkTime(difficulty) };
+    }
+    case 'checkers': {
+      const typed = state as CheckersState;
+      if (typed.turn !== seat) return null;
+      const move = checkersMove(typed, seat, difficulty);
+      return move === null
+        ? null
+        : { action: { type: 'move', from: move.from, to: move.to }, delayMs: thinkTime(difficulty) };
+    }
+    case 'mancala': {
+      const typed = state as MancalaState;
+      if (typed.turn !== seat) return null;
+      const pit = mancalaMove(typed, seat, difficulty);
+      return pit < 0 ? null : { action: { type: 'sow', pit }, delayMs: thinkTime(difficulty) };
+    }
+    case 'hex': {
+      const typed = state as HexState;
+      if (typed.turn !== seat) return null;
+      const index = hexMove(typed, seat, difficulty);
+      return index < 0 ? null : { action: { type: 'place', index }, delayMs: thinkTime(difficulty) };
     }
     default:
       return null;

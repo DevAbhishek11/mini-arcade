@@ -42,6 +42,21 @@ describe('game catalog', () => {
     expect(response.body.items.map((g: { id: string }) => g.id)).toEqual([...GAME_IDS]);
   });
 
+  it('serves the catalog from a strong etag, answering repeat visits with 304', async () => {
+    const first = await request(app).get('/api/games').expect(200);
+    const etag = first.headers.etag;
+
+    expect(etag).toMatch(/^"/);
+    expect(first.headers['cache-control']).toContain('max-age=300');
+
+    const revalidated = await request(app).get('/api/games').set('if-none-match', etag).expect(304);
+    expect(revalidated.text).toBe('');
+
+    // A weak tag from an intermediary proxy still counts as a match.
+    await request(app).get('/api/games').set('if-none-match', `W/${etag}`).expect(304);
+    await request(app).get('/api/games').set('if-none-match', '"stale"').expect(200);
+  });
+
   it('describes how to play every cabinet', async () => {
     const response = await request(app).get('/api/games').expect(200);
     for (const game of response.body.items as { howTo: string[]; averageMinutes: number }[]) {
