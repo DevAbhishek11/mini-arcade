@@ -281,7 +281,8 @@ npm test            # vitest — 35 tests
 npm run build       # shared → server → frontend
 ```
 
-CI (`.github/workflows/ci.yml`) runs the whole chain plus both Docker builds on every push.
+A ready-to-use pipeline lives at `.github/ci.example.yml` — copy it to `.github/workflows/ci.yml` to enable
+it. It runs the whole chain plus both Docker builds on every push.
 
 ---
 
