@@ -128,7 +128,7 @@ describe('auth + players', () => {
 
 describe('leaderboard', () => {
   it('validates query parameters', async () => {
-    const response = await request(app).get('/api/leaderboard?game=chess').expect(400);
+    const response = await request(app).get('/api/leaderboard?game=quidditch').expect(400);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
     await request(app).get('/api/leaderboard?limit=9999').expect(400);
   });

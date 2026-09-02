@@ -1,6 +1,6 @@
 # Mini Arcade
 
-A realtime, multiplayer arcade built as a production-shaped TypeScript monorepo. **Eleven games**, matchmaking
+A realtime, multiplayer arcade built as a production-shaped TypeScript monorepo. **Fifteen games**, matchmaking
 by rating in seconds, private rooms for friends, bots with three difficulties, and a full progression layer
 (XP, levels, daily streaks, quests and achievements). Every game is **server-authoritative** over websockets —
 the browser only renders and predicts, the server decides. It is also an installable PWA that keeps working
@@ -43,7 +43,7 @@ nginx  ──sticky──▶  api replicas  ──▶  Postgres (durable state)
 
 | Area        | Highlights                                                                                      |
 | ----------- | ----------------------------------------------------------------------------------------------- |
-| Games       | 11 cabinets, from 60-second Tic Tac Toe to Hex, Checkers, Mancala and Ultimate Tic Tac Toe      |
+| Games       | 15 cabinets: full-rules Chess, Sudoku Duel, Bingo Blitz, Nine Men's Morris, Hex, Checkers…      |
 | Play modes  | Ranked quick match, unrated practice vs bots (3 difficulties), private rooms with a 5-char code |
 | Progression | XP & levels, daily streaks, 3 rotating daily quests, 12 achievements, per-match reward summary  |
 | Social      | Per-match chat, 8 emotes with sound, one-tap rematch with swapped seats, shareable invite links |
@@ -55,9 +55,9 @@ nginx  ──sticky──▶  api replicas  ──▶  Postgres (durable state)
 | Hardening   | zod-validated env & requests, helmet, CORS, distributed rate limits, request timeouts           |
 | Ops         | `/api/system` health, `/api/system/ready` readiness, Prometheus `/metrics`, structured logs     |
 | Solo play   | If nobody is queued, a bot opponent joins — its strength is matched to your rating              |
-| Offline     | Installable PWA: all 11 games playable vs the bot or pass-and-play with no network at all       |
+| Offline     | Installable PWA: all 15 games playable vs the bot or pass-and-play with no network at all       |
 
-Eleven engines, one implementation each: every game is a pure, immutable reducer in `@mini-arcade/shared`,
+Fifteen engines, one implementation each: every game is a pure, immutable reducer in `@mini-arcade/shared`,
 so the server validates with the exact code the browser renders with.
 
 ---
@@ -82,6 +82,15 @@ so the server validates with the exact code the browser renders with.
 | Checkers             | turn based | 8×8           | Captures are compulsory, multi-jumps chain, kings crown on the back rank |
 | Mancala              | turn based | Kalah 6×4     | Land in your store to move again; land in an empty pit to capture        |
 | Hex                  | turn based | 11×11 rhombus | Connect your two edges — Hex cannot be drawn — with the swap rule        |
+
+### Strategy & classics
+
+| Game              | Mode       | Board     | Notes                                                                     |
+| ----------------- | ---------- | --------- | ------------------------------------------------------------------------- |
+| Chess             | turn based | 8×8       | Castling, en passant, promotion, stalemate, fifty-move and dead positions |
+| Sudoku Duel       | turn based | 9×9       | One grid, two solvers: right digit scores, wrong digit costs              |
+| Bingo Blitz       | turn based | 5×5 cards | You pick which of three balls is called, and it marks _both_ cards        |
+| Nine Men's Morris | turn based | 24 points | Place, slide, form mills to capture, and fly once you are down to three   |
 
 Each cabinet ships with a _how to play_ sheet, a difficulty rating and an expected match length, and the
 lobby can be filtered by mode or by "under 3 minutes".
@@ -264,6 +273,12 @@ get(key) ─▶ L1 LRU (per process, 5 s TTL) ──hit──▶ value
   boot and served behind a strong ETag (`staticJson`), so repeat visits cost a 304 with an empty body and no
   `JSON.stringify` per request.
 
+### Brand
+
+The mark is an "A" built from an arcade joystick. It ships twice: as
+`components/brand/Logo.tsx` (hand authored SVG — crisp at favicon size, inherits the page colours, and
+animates on the boot screen) and as raster PWA icons under `public/icons/` generated from the same design.
+
 ### Frontend delivery
 
 - **Route level code splitting** — every page past the landing screens is a `React.lazy` chunk, so the first
@@ -272,6 +287,10 @@ get(key) ─▶ L1 LRU (per process, 5 s TTL) ──hit──▶ value
 - **Artwork** — cabinet art is WebP at ~15–40 kB each, resolved by convention from the game id
   (`/art/<game-id>.webp`), and precached by the service worker.
 - **Skeletons, not spinners** — a suspended route renders the shape of the page it is about to become.
+- **Motion** — a small keyframe vocabulary in `styles/index.css` (`drop-in`, `flip-in`, `capture`,
+  `slide-piece`, `ball-roll`, `win-flash`) is shared by every board: discs fall with gravity, Reversi discs
+  turn over, captured checkers burst, and winning lines pulse. All of it collapses under
+  `prefers-reduced-motion`.
 
 | Bundle (gzip)         | Size     |
 | --------------------- | -------- |
@@ -407,7 +426,7 @@ frontend/
 ```bash
 npm run lint        # eslint (typescript-eslint, flat config)
 npm run typecheck   # tsc --noEmit across all workspaces
-npm test            # vitest — 180 tests across server and web
+npm test            # vitest — 223 tests across server and web
 npm run build       # shared → server → frontend
 ```
 

@@ -16,6 +16,10 @@ import {
   REVERSI_SIZE,
   SNAKE_GRID,
   TOTAL_EDGES,
+  bingoBestLine,
+  chessEngine,
+  chessInCheck,
+  chessLegalMoves,
   checkersEngine,
   checkersLegalMoves,
   connectFourEngine,
@@ -25,13 +29,28 @@ import {
   mancalaEngine,
   mancalaLegalMoves,
   mancalaPitsOf,
+  MORRIS_ADJACENCY,
+  MORRIS_MILLS,
+  morrisEngine,
+  morrisLegalMoves,
+  morrisRemovable,
+  sudokuCandidates,
+  sudokuOpenCells,
   ultimateTicTacToeEngine,
   utttLegalMoves,
   reversiEngine,
   ticTacToeEngine,
+  otherSeat,
   toXY,
+  type BingoState,
   type CheckersMove,
   type CheckersState,
+  type ChessMove,
+  type ChessPiece,
+  type ChessState,
+  type MorrisAction,
+  type MorrisState,
+  type SudokuState,
   type ConnectFourState,
   type Direction,
   type HexState,
@@ -414,6 +433,310 @@ function snakeMove(state: SnakeState, seat: Seat, difficulty: BotDifficulty): Di
 /* --------------------------------- driver --------------------------------- */
 
 /** Pong/Snake bots play "chill" by default — a perfect tracker is no fun. */
+
+/* ---------------------------------------------------------------- chess -- */
+
+/** Centipawn values; the king is priceless but never actually captured. */
+const CHESS_VALUE: Record<string, number> = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20_000 };
+
+/**
+ * Piece square tables from white's point of view, mirrored for black. They
+ * are what stop the bot from shuffling its rooks around on the back rank.
+ */
+const CHESS_PST: Record<string, readonly number[]> = {
+  p: [
+    0, 0, 0, 0, 0, 0, 0, 0, 50, 50, 50, 50, 50, 50, 50, 50, 10, 10, 20, 30, 30, 20, 10, 10, 5, 5, 10, 25, 25,
+    10, 5, 5, 0, 0, 0, 20, 20, 0, 0, 0, 5, -5, -10, 0, 0, -10, -5, 5, 5, 10, 10, -20, -20, 10, 10, 5, 0, 0, 0,
+    0, 0, 0, 0, 0,
+  ],
+  n: [
+    -50, -40, -30, -30, -30, -30, -40, -50, -40, -20, 0, 0, 0, 0, -20, -40, -30, 0, 10, 15, 15, 10, 0, -30, -30,
+    5, 15, 20, 20, 15, 5, -30, -30, 0, 15, 20, 20, 15, 0, -30, -30, 5, 10, 15, 15, 10, 5, -30, -40, -20, 0, 5,
+    5, 0, -20, -40, -50, -40, -30, -30, -30, -30, -40, -50,
+  ],
+  b: [
+    -20, -10, -10, -10, -10, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5, 10, 10, 5, 0, -10, -10, 5, 5,
+    10, 10, 5, 5, -10, -10, 0, 10, 10, 10, 10, 0, -10, -10, 10, 10, 10, 10, 10, 10, -10, -10, 5, 0, 0, 0, 0, 5,
+    -10, -20, -10, -10, -10, -10, -10, -10, -20,
+  ],
+  r: [
+    0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 10, 10, 10, 10, 10, 5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5,
+    -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 5, 5, 0, 0, 0,
+  ],
+  q: [
+    -20, -10, -10, -5, -5, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5, 5, 5, 5, 0, -10, -5, 0, 5, 5,
+    5, 5, 0, -5, 0, 0, 5, 5, 5, 5, 0, -5, -10, 5, 5, 5, 5, 5, 0, -10, -10, 0, 5, 0, 0, 0, 0, -10, -20, -10, -10,
+    -5, -5, -10, -10, -20,
+  ],
+  k: [
+    -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50,
+    -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -20, -30, -30, -40, -40, -30, -30, -20, -10, -20,
+    -20, -20, -20, -20, -20, -10, 20, 20, 0, 0, 0, 0, 20, 20, 20, 30, 10, 0, 0, 10, 30, 20,
+  ],
+};
+
+/** Material plus placement, from `seat`'s point of view. */
+function chessEvaluate(state: ChessState, seat: Seat): number {
+  let score = 0;
+  state.board.forEach((piece: ChessPiece | null, square: number) => {
+    if (!piece) return;
+    // Seat 0 sits at the bottom, so black reads the tables upside down.
+    const view = piece.seat === 0 ? square : 63 - square;
+    const value = (CHESS_VALUE[piece.kind] ?? 0) + (CHESS_PST[piece.kind]?.[view] ?? 0);
+    score += piece.seat === seat ? value : -value;
+  });
+  return score;
+}
+
+/** Captures first, so alpha-beta prunes far more of the tree. */
+function chessOrdered(state: ChessState, moves: ChessMove[]): ChessMove[] {
+  return moves.slice().sort((a, b) => {
+    const gain = (move: ChessMove) => {
+      const victim = move.captures !== undefined ? state.board[move.captures] : null;
+      const attacker = state.board[move.from];
+      if (!victim) return move.promotion ? 800 : 0;
+      return (CHESS_VALUE[victim.kind] ?? 0) - (CHESS_VALUE[attacker?.kind ?? 'p'] ?? 0) / 10;
+    };
+    return gain(b) - gain(a);
+  });
+}
+
+function chessSearch(state: ChessState, seat: Seat, depth: number, alpha: number, beta: number): number {
+  if (state.finished) {
+    if (state.winnerSeat === null) return 0;
+    // Prefer the mate that arrives sooner.
+    return state.winnerSeat === seat ? 100_000 + depth : -100_000 - depth;
+  }
+  if (depth === 0) return chessEvaluate(state, seat);
+
+  const maximising = state.turn === seat;
+  let best = maximising ? -Infinity : Infinity;
+  let a = alpha;
+  let b = beta;
+
+  for (const move of chessOrdered(state, state.legal)) {
+    const result = chessEngine.apply(
+      state,
+      state.turn,
+      { type: 'move', from: move.from, to: move.to, promotion: move.promotion },
+      0,
+    );
+    if (!result.ok) continue;
+
+    const score = chessSearch(result.state, seat, depth - 1, a, b);
+    if (maximising) {
+      best = Math.max(best, score);
+      a = Math.max(a, score);
+    } else {
+      best = Math.min(best, score);
+      b = Math.min(b, score);
+    }
+    if (b <= a) break;
+  }
+
+  return Number.isFinite(best) ? best : chessEvaluate(state, seat);
+}
+
+function chessMove(state: ChessState, seat: Seat, difficulty: BotDifficulty): ChessMove | null {
+  const moves = chessLegalMoves(state, seat);
+  if (moves.length === 0) return null;
+  if (Math.random() < blunderChance[difficulty]) return moves[randomInt(moves.length)] as ChessMove;
+
+  // Chess branches hard, so depth is bought carefully.
+  const depth = difficulty === 'brutal' ? 3 : 2;
+  let best = moves[0] as ChessMove;
+  let bestScore = -Infinity;
+
+  for (const move of chessOrdered(state, moves)) {
+    const result = chessEngine.apply(
+      state,
+      seat,
+      { type: 'move', from: move.from, to: move.to, promotion: move.promotion },
+      0,
+    );
+    if (!result.ok) continue;
+
+    let score = chessSearch(result.state, seat, depth - 1, -Infinity, Infinity);
+    // A little nudge towards checks and away from hanging the moved piece.
+    if (chessInCheck(result.state.board, otherSeat(seat))) score += 15;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = move;
+    }
+  }
+
+  return best;
+}
+
+/* --------------------------------------------------------------- sudoku -- */
+
+/**
+ * The bot solves the way a person does: it looks for cells with a single
+ * candidate. Weaker settings guess among the near-certain ones instead, which
+ * costs them points when they get it wrong.
+ */
+function sudokuMove(
+  state: SudokuState,
+  _seat: Seat,
+  difficulty: BotDifficulty,
+): { cell: number; value: number } | null {
+  const open = sudokuOpenCells(state);
+  if (open.length === 0) return null;
+
+  const confidence = difficulty === 'brutal' ? 1 : difficulty === 'sharp' ? 2 : 3;
+
+  for (const cell of open) {
+    const candidates = sudokuCandidates(state.board, cell);
+    if (candidates.length === 0) continue;
+    if (candidates.length <= confidence) {
+      return { cell, value: candidates[randomInt(candidates.length)] as number };
+    }
+  }
+
+  // Nothing obvious: take the most constrained cell and pick from its options.
+  const cell = open[0] as number;
+  const candidates = sudokuCandidates(state.board, cell);
+  const pool = candidates.length > 0 ? candidates : [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  return { cell, value: pool[randomInt(pool.length)] as number };
+}
+
+/* ---------------------------------------------------------------- bingo -- */
+
+/**
+ * Balance greed against denial: how much a ball helps me, minus how much it
+ * helps them, weighted by how close each card is to a line.
+ */
+function bingoMove(state: BingoState, seat: Seat, difficulty: BotDifficulty): number | null {
+  if (state.choices.length === 0) return null;
+  if (Math.random() < blunderChance[difficulty]) {
+    return state.choices[randomInt(state.choices.length)] as number;
+  }
+
+  const rival = otherSeat(seat);
+  let best = state.choices[0] as number;
+  let bestScore = -Infinity;
+
+  for (const ball of state.choices) {
+    const mine = bingoBestLine(state.cards[seat], state.marked[seat]);
+    const theirs = bingoBestLine(state.cards[rival], state.marked[rival]);
+
+    // Completing a line ends the game in the caller's favour.
+    const winsForMe = mine.missing.length === 1 && mine.missing[0] === ball;
+    const winsForThem = theirs.missing.length === 1 && theirs.missing[0] === ball;
+
+    const helpsMe = state.cards[seat].includes(ball) ? 10 / Math.max(1, mine.missing.length) : 0;
+    const helpsThem = state.cards[rival].includes(ball) ? 10 / Math.max(1, theirs.missing.length) : 0;
+
+    // The caller wins ties, so a ball that completes both cards is still good.
+    const score = (winsForMe ? 1000 : 0) - (winsForThem && !winsForMe ? 800 : 0) + helpsMe - helpsThem * 1.2;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = ball;
+    }
+  }
+
+  return best;
+}
+
+/* ------------------------------------------------------ nine mens morris -- */
+
+/** Mills made, pieces held, and how much room the pieces have to move. */
+function morrisEvaluate(state: MorrisState, seat: Seat): number {
+  const rival = otherSeat(seat);
+  const material = (state.onBoard[seat] + state.hand[seat] - (state.onBoard[rival] + state.hand[rival])) * 100;
+
+  const millsFor = (owner: Seat) =>
+    MORRIS_MILLS.filter((mill) => mill.every((point) => state.board[point] === owner)).length;
+  const mobilityFor = (owner: Seat) =>
+    state.board.reduce(
+      (total: number, cell: Seat | null, index: number) =>
+        cell === owner
+          ? total + (MORRIS_ADJACENCY[index] ?? []).filter((point) => state.board[point] === null).length
+          : total,
+      0,
+    );
+
+  return material + (millsFor(seat) - millsFor(rival)) * 40 + (mobilityFor(seat) - mobilityFor(rival)) * 4;
+}
+
+function morrisSearch(state: MorrisState, seat: Seat, depth: number, alpha: number, beta: number): number {
+  if (state.finished) {
+    if (state.winnerSeat === null) return 0;
+    return state.winnerSeat === seat ? 50_000 + depth : -50_000 - depth;
+  }
+  if (depth === 0) return morrisEvaluate(state, seat);
+
+  const moves = morrisLegalMoves(state);
+  if (moves.length === 0) return morrisEvaluate(state, seat);
+
+  const maximising = state.turn === seat;
+  let best = maximising ? -Infinity : Infinity;
+  let a = alpha;
+  let b = beta;
+
+  for (const move of moves) {
+    const result = morrisEngine.apply(state, state.turn, move, 0);
+    if (!result.ok) continue;
+
+    const score = morrisSearch(result.state, seat, depth - 1, a, b);
+    if (maximising) {
+      best = Math.max(best, score);
+      a = Math.max(a, score);
+    } else {
+      best = Math.min(best, score);
+      b = Math.min(b, score);
+    }
+    if (b <= a) break;
+  }
+
+  return Number.isFinite(best) ? best : morrisEvaluate(state, seat);
+}
+
+function morrisMove(state: MorrisState, seat: Seat, difficulty: BotDifficulty): MorrisAction | null {
+  const moves = morrisLegalMoves(state);
+  if (moves.length === 0) return null;
+
+  // Taking a piece is a forced follow-up: just take the most valuable one.
+  if (state.mustRemove) {
+    const options = morrisRemovable(state, seat);
+    if (options.length === 0) return null;
+    if (Math.random() < blunderChance[difficulty]) {
+      return { type: 'remove', point: options[randomInt(options.length)] as number };
+    }
+    // Prefer a piece that is one step from completing a mill.
+    const rival = otherSeat(seat);
+    const threat = (point: number) =>
+      MORRIS_MILLS.filter(
+        (mill) =>
+          mill.includes(point) &&
+          mill.filter((cell) => state.board[cell] === rival).length === 2 &&
+          mill.some((cell) => state.board[cell] === null),
+      ).length;
+    const best = options.slice().sort((x, y) => threat(y) - threat(x))[0] as number;
+    return { type: 'remove', point: best };
+  }
+
+  if (Math.random() < blunderChance[difficulty]) return moves[randomInt(moves.length)] as MorrisAction;
+
+  const depth = difficulty === 'brutal' ? 4 : 3;
+  let best = moves[0] as MorrisAction;
+  let bestScore = -Infinity;
+
+  for (const move of moves) {
+    const result = morrisEngine.apply(state, seat, move, 0);
+    if (!result.ok) continue;
+    const score = morrisSearch(result.state, seat, depth - 1, -Infinity, Infinity);
+    if (score > bestScore) {
+      bestScore = score;
+      best = move;
+    }
+  }
+
+  return best;
+}
+
 const DEFAULT_DIFFICULTY: Record<GameId, BotDifficulty> = {
   'tic-tac-toe': 'sharp',
   'connect-four': 'sharp',
@@ -426,6 +749,10 @@ const DEFAULT_DIFFICULTY: Record<GameId, BotDifficulty> = {
   checkers: 'sharp',
   mancala: 'sharp',
   hex: 'sharp',
+  chess: 'sharp',
+  sudoku: 'sharp',
+  bingo: 'sharp',
+  'nine-mens-morris': 'sharp',
 };
 
 const thinkTime = (difficulty: BotDifficulty) =>
@@ -864,6 +1191,36 @@ export function decide(
       if (typed.turn !== seat) return null;
       const index = hexMove(typed, seat, difficulty);
       return index < 0 ? null : { action: { type: 'place', index }, delayMs: thinkTime(difficulty) };
+    }
+    case 'chess': {
+      const typed = state as ChessState;
+      if (typed.turn !== seat || typed.finished) return null;
+      const move = chessMove(typed, seat, difficulty);
+      return move === null
+        ? null
+        : {
+            action: { type: 'move', from: move.from, to: move.to, promotion: move.promotion },
+            delayMs: thinkTime(difficulty),
+          };
+    }
+    case 'sudoku': {
+      const typed = state as SudokuState;
+      if (typed.turn !== seat || typed.finished) return null;
+      const guess = sudokuMove(typed, seat, difficulty);
+      return guess === null ? null : { action: { type: 'fill', ...guess }, delayMs: thinkTime(difficulty) };
+    }
+    case 'bingo': {
+      const typed = state as BingoState;
+      if (typed.turn !== seat || typed.finished) return null;
+      const ball = bingoMove(typed, seat, difficulty);
+      return ball === null ? null : { action: { type: 'call', number: ball }, delayMs: thinkTime(difficulty) };
+    }
+    case 'nine-mens-morris': {
+      const typed = state as MorrisState;
+      if (typed.turn !== seat || typed.finished) return null;
+      const move = morrisMove(typed, seat, difficulty);
+      // Removing a piece is the same turn, so it thinks quickly.
+      return move === null ? null : { action: move, delayMs: typed.mustRemove ? 400 : thinkTime(difficulty) };
     }
     default:
       return null;

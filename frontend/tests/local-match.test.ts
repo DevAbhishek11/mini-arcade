@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GAME_LIST, ticTacToeEngine, type SnakeState, type TicTacToeState } from '@mini-arcade/shared';
+import {
+  GAME_LIST,
+  sudokuCandidates,
+  sudokuOpenCells,
+  ticTacToeEngine,
+  type SnakeState,
+  type SudokuState,
+  type TicTacToeState,
+} from '@mini-arcade/shared';
 import { LocalMatch, type LocalResult, type LocalSnapshot } from '@/lib/local-match';
 
 /** Drains the bot's think-timeouts until the match reports a result. */
@@ -284,8 +292,26 @@ describe('LocalMatch — every cabinet plays offline', () => {
             legal?: unknown[];
             board?: (number | null)[];
             edges?: boolean[];
-            columns?: unknown[];
+            choices?: number[];
           };
+
+          // Games with richer actions describe them fully in `legal`.
+          if (gameId === 'chess') {
+            const move = state.legal?.[0] as { from: number; to: number; promotion?: string } | undefined;
+            return move ? { type: 'move', from: move.from, to: move.to, promotion: move.promotion } : null;
+          }
+          if (gameId === 'nine-mens-morris') return state.legal?.[0] ?? null;
+          if (gameId === 'bingo') {
+            const ball = state.choices?.[0];
+            return ball === undefined ? null : { type: 'call', number: ball };
+          }
+          if (gameId === 'sudoku') {
+            const sudoku = snapshot.state as SudokuState;
+            const cell = sudokuOpenCells(sudoku)[0];
+            if (cell === undefined) return null;
+            const candidates = sudokuCandidates(sudoku.board, cell);
+            return { type: 'fill', cell, value: candidates[0] ?? 1 };
+          }
 
           // Newer engines publish their legal moves; older ones are simple
           // enough to read straight off the board.

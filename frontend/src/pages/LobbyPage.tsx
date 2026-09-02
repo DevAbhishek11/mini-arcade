@@ -208,8 +208,8 @@ export function LobbyPage() {
               Sixty seconds away.
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-pretty text-base text-slate-400 lg:mx-0">
-              Seven classic cabinets with instant rating-based matchmaking, private rooms for friends, bots that
-              actually play well — and a full offline mode when the wifi gives up.
+              Fifteen classic cabinets with instant rating-based matchmaking, private rooms for friends, bots
+              that actually play well — and a full offline mode when the wifi gives up.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
@@ -321,8 +321,9 @@ export function LobbyPage() {
           {games.map((game, index) => (
             <article
               key={game.id}
-              className="group relative animate-[slide-up_0.5s_cubic-bezier(0.22,1,0.36,1)_both] overflow-hidden rounded-[--radius-card] border border-white/5 bg-void-900/70 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-white/15"
-              style={{ animationDelay: `${index * 60}ms` }}
+              className="group relative animate-slide-up overflow-hidden rounded-[--radius-card] border border-white/5 bg-void-900/70 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 hover:border-white/15 hover:shadow-[0_20px_60px_-25px] hover:shadow-neon-cyan/40"
+              // Cap the stagger so the last of fifteen cabinets is not left waiting.
+              style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
             >
               <Link to={`/play/${game.id}`} className="block">
                 <div className="relative aspect-[16/10] overflow-hidden">

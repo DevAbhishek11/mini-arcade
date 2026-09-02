@@ -1,3 +1,4 @@
+import type React from 'react';
 import clsx from 'clsx';
 import { COLUMNS, ROWS, type ConnectFourState, type Seat } from '@mini-arcade/shared';
 
@@ -43,7 +44,12 @@ export function ConnectFourBoard({
         {Array.from({ length: ROWS * COLUMNS }, (_, index) => {
           const cell = state.board[index];
           const column = index % COLUMNS;
+          const row = Math.floor(index / COLUMNS);
           const playable = state.board[column] === null && yourTurn;
+          // The lowest filled disc in the column that was just played is the
+          // one that needs to fall.
+          const justLanded =
+            state.lastColumn === column && cell !== null && state.board[index - COLUMNS] === null && row >= 0;
           return (
             <button
               key={index}
@@ -61,7 +67,17 @@ export function ConnectFourBoard({
               )}
             >
               {cell !== null && (
-                <span className="absolute inset-0 animate-[pop_0.25s_cubic-bezier(0.34,1.56,0.64,1)_both] rounded-full" />
+                <span
+                  className={clsx(
+                    'absolute inset-0 rounded-full',
+                    justLanded ? 'animate-slide-piece' : 'animate-pop',
+                    winning.has(index) && 'animate-win-flash',
+                  )}
+                  // Fall in from above the board, so the drop reads as gravity.
+                  style={
+                    justLanded ? ({ '--slide-y': `${-(row + 1) * 118}%` } as React.CSSProperties) : undefined
+                  }
+                />
               )}
             </button>
           );

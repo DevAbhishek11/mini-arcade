@@ -86,11 +86,17 @@ export function CheckersBoard({
                       ? 'bg-gradient-to-br from-slate-100 to-slate-400 text-void-900'
                       : 'bg-gradient-to-br from-neon-pink to-rose-700 text-white',
                     index === selected && 'scale-110 ring-2 ring-neon-cyan',
+                    index === state.lastMove?.to && 'animate-drop-in',
                     piece.seat === seat && sources.has(index) && yourTurn && 'ring-1 ring-white/40',
                   )}
                 >
                   {piece.king ? <span className="text-xs font-bold">♔</span> : null}
                 </span>
+              ) : null}
+
+              {/* Where a piece was taken, leave a fading burst. */}
+              {captureHere ? (
+                <span className="pointer-events-none absolute size-[70%] animate-capture rounded-full bg-neon-pink/70" />
               ) : null}
 
               {isTarget ? (

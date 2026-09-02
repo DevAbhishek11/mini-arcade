@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { sound } from '@/lib/sound';
+import { Logo } from '@/components/brand/Logo';
 import { useProgression } from '@/store/progression';
 import { useSession } from '@/store/session';
 
@@ -155,10 +156,8 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/5 bg-void-950/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-        <NavLink to="/" className="group flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-neon-cyan to-neon-violet font-display text-lg font-bold text-void-950 transition-transform duration-300 group-hover:rotate-6">
-            A
-          </span>
+        <NavLink to="/" className="group flex items-center gap-2.5" aria-label="Mini Arcade home">
+          <Logo className="size-9 transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110" />
           <span className="font-display text-lg font-bold tracking-tight text-white">
             Mini<span className="text-neon-cyan neon-text">Arcade</span>
           </span>

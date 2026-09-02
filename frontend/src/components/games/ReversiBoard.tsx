@@ -54,7 +54,9 @@ export function ReversiBoard({
                     cell === 0
                       ? 'bg-gradient-to-br from-slate-50 to-slate-400'
                       : 'bg-gradient-to-br from-void-700 to-black ring-1 ring-white/15',
-                    flipped.has(index) && 'animate-[pop_0.3s_cubic-bezier(0.34,1.56,0.64,1)_both]',
+                    // A flipped disc rotates; a newly placed one drops in.
+                    flipped.has(index) && 'animate-flip-in',
+                    index === state.lastIndex && 'animate-drop-in',
                   )}
                 />
               )}

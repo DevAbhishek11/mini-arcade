@@ -90,7 +90,8 @@ export function DotsAndBoxesBoard({
               rx={8}
               fill={SEAT_COLOR[owner]}
               opacity={claimed.has(box) ? 0.42 : 0.2}
-              className={clsx(claimed.has(box) && 'animate-[pop_0.3s_cubic-bezier(0.34,1.56,0.64,1)_both]')}
+              className={clsx(claimed.has(box) && 'animate-pop origin-center')}
+              style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
             />
           ),
         )}

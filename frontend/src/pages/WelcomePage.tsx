@@ -24,7 +24,7 @@ const REASONS = [
   {
     icon: '📶',
     title: 'Works offline',
-    copy: 'Install it and all seven games keep working with no connection — the engines ship to your browser.',
+    copy: 'Install it and all fifteen games keep working with no connection — the engines ship to your browser.',
   },
 ] as const;
 
@@ -81,14 +81,14 @@ export function WelcomePage() {
             </Badge>
 
             <h1 className="mt-5 font-display text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
-              Seven classics.
+              Fifteen classics.
               <br />
               <span className="neon-text">Real opponents.</span>
             </h1>
 
             <p className="mt-5 max-w-xl text-lg text-slate-300">
-              Tic Tac Toe, Connect Four, Gomoku, Reversi, Dots &amp; Boxes, Neon Pong and Snake Duel — matched
-              by rating in seconds, or played against a bot that never blunders.
+              Chess, Checkers, Hex, Sudoku Duel, Bingo Blitz, Nine Men&apos;s Morris, Neon Pong and eight more —
+              matched by rating in seconds, or played against a bot that never blunders.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">

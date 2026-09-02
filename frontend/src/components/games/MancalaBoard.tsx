@@ -32,7 +32,7 @@ function Pit({
         playable
           ? 'cursor-pointer border-neon-cyan/40 bg-neon-cyan/10 hover:scale-105 hover:bg-neon-cyan/20'
           : 'border-white/10 bg-void-900/70',
-        highlight && 'ring-2 ring-neon-amber',
+        highlight && 'animate-pop ring-2 ring-neon-amber',
       )}
     >
       <span className="font-mono text-lg font-bold tabular-nums">{count}</span>

@@ -11,6 +11,10 @@ import { ultimateTicTacToeEngine } from './ultimate-tic-tac-toe.js';
 import { checkersEngine } from './checkers.js';
 import { mancalaEngine } from './mancala.js';
 import { hexEngine } from './hex.js';
+import { chessEngine } from './chess.js';
+import { sudokuEngine } from './sudoku.js';
+import { bingoEngine } from './bingo.js';
+import { morrisEngine } from './nine-mens-morris.js';
 
 export * from './types.js';
 export * from './tic-tac-toe.js';
@@ -24,6 +28,10 @@ export * from './ultimate-tic-tac-toe.js';
 export * from './checkers.js';
 export * from './mancala.js';
 export * from './hex.js';
+export * from './chess.js';
+export * from './sudoku.js';
+export * from './bingo.js';
+export * from './nine-mens-morris.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const ENGINES: Record<GameId, GameEngine<any, any>> = {
@@ -38,6 +46,10 @@ export const ENGINES: Record<GameId, GameEngine<any, any>> = {
   checkers: checkersEngine,
   mancala: mancalaEngine,
   hex: hexEngine,
+  chess: chessEngine,
+  sudoku: sudokuEngine,
+  bingo: bingoEngine,
+  'nine-mens-morris': morrisEngine,
 };
 
 export function getEngine(gameId: GameId): GameEngine<any, any> {

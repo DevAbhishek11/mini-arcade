@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, type ReactElement } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Logo } from '@/components/brand/Logo';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { UpdatePrompt } from '@/components/pwa/UpdatePrompt';
@@ -33,9 +34,7 @@ function BootScreen({ error }: { error: string | null }) {
   return (
     <div className="grid min-h-dvh place-items-center px-6 text-center">
       <div>
-        <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-neon-cyan to-neon-violet font-display text-2xl font-bold text-void-950">
-          A
-        </div>
+        <Logo className="mx-auto size-16" animated />
         {error ? (
           <>
             <h1 className="mt-6 text-xl font-bold">Cannot reach the arcade</h1>

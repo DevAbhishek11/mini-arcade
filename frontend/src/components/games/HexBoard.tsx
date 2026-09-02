@@ -59,7 +59,8 @@ export function HexBoard({
                 className={clsx(
                   'transition-all duration-150',
                   playable && 'cursor-pointer',
-                  winning.has(index) && 'drop-shadow-[0_0_6px_rgba(163,230,53,0.9)]',
+                  winning.has(index) && 'animate-win-flash drop-shadow-[0_0_6px_rgba(163,230,53,0.9)]',
+                  index === state.lastIndex && 'animate-pop',
                 )}
                 fill={
                   cell === 0

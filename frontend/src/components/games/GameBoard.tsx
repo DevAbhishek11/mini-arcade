@@ -1,27 +1,36 @@
 import type {
+  BingoState,
   CheckersState,
+  ChessState,
   ConnectFourState,
   DotsState,
   GameId,
   GomokuState,
   HexState,
   MancalaState,
+  MorrisState,
+  PieceKind,
   PongState,
   ReversiState,
   Seat,
   SnakeState,
+  SudokuState,
   TicTacToeState,
   UltimateTicTacToeState,
 } from '@mini-arcade/shared';
+import { BingoBoard } from './BingoBoard';
 import { CheckersBoard } from './CheckersBoard';
+import { ChessBoard } from './ChessBoard';
 import { ConnectFourBoard } from './ConnectFourBoard';
 import { DotsAndBoxesBoard } from './DotsAndBoxesBoard';
 import { GomokuBoard } from './GomokuBoard';
 import { HexBoard } from './HexBoard';
 import { MancalaBoard } from './MancalaBoard';
+import { NineMensMorrisBoard } from './NineMensMorrisBoard';
 import { PongCanvas } from './PongCanvas';
 import { ReversiBoard } from './ReversiBoard';
 import { SnakeDuelCanvas } from './SnakeDuelCanvas';
+import { SudokuBoard } from './SudokuBoard';
 import { TicTacToeBoard } from './TicTacToeBoard';
 import { UltimateTicTacToeBoard } from './UltimateTicTacToeBoard';
 
@@ -134,6 +143,44 @@ export function GameBoard({ gameId, state, seat, yourTurn, onAction }: Props) {
           yourTurn={yourTurn}
           onPlay={(index) => onAction({ type: 'place', index })}
           onSwap={() => onAction({ type: 'swap' })}
+        />
+      );
+    case 'chess':
+      return (
+        <ChessBoard
+          state={state as ChessState}
+          seat={seat}
+          yourTurn={yourTurn}
+          onPlay={(from, to, promotion?: Exclude<PieceKind, 'p' | 'k'>) =>
+            onAction({ type: 'move', from, to, promotion })
+          }
+        />
+      );
+    case 'sudoku':
+      return (
+        <SudokuBoard
+          state={state as SudokuState}
+          seat={seat}
+          yourTurn={yourTurn}
+          onPlay={(cell, value) => onAction({ type: 'fill', cell, value })}
+        />
+      );
+    case 'bingo':
+      return (
+        <BingoBoard
+          state={state as BingoState}
+          seat={seat}
+          yourTurn={yourTurn}
+          onPlay={(ball) => onAction({ type: 'call', number: ball })}
+        />
+      );
+    case 'nine-mens-morris':
+      return (
+        <NineMensMorrisBoard
+          state={state as MorrisState}
+          seat={seat}
+          yourTurn={yourTurn}
+          onPlay={(action) => onAction(action)}
         />
       );
     default:

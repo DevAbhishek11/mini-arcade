@@ -39,7 +39,8 @@ export function TicTacToeBoard({
             {cell !== null && (
               <span
                 className={clsx(
-                  'animate-[pop_0.28s_cubic-bezier(0.34,1.56,0.64,1)_both] font-display text-5xl font-bold',
+                  'animate-pop font-display text-5xl font-bold',
+                  winning.has(index) && 'animate-win-flash',
                   mine ? 'text-neon-cyan' : 'text-neon-pink',
                 )}
               >

@@ -47,7 +47,9 @@ export function GomokuBoard({
               {cell !== null && (
                 <span
                   className={clsx(
-                    'block size-[78%] animate-[pop_0.2s_cubic-bezier(0.34,1.56,0.64,1)_both] rounded-full',
+                    'block size-[78%] animate-pop rounded-full',
+                    index === state.lastIndex && 'animate-drop-in',
+                    winning.has(index) && 'animate-win-flash',
                     cell === 0
                       ? 'bg-gradient-to-br from-slate-100 to-slate-400'
                       : 'bg-gradient-to-br from-void-600 to-void-900 ring-1 ring-white/20',

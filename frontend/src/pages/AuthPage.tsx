@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Logo } from '@/components/brand/Logo';
 import { Button } from '@/components/ui/Button';
 import { ApiRequestError } from '@/lib/api';
 import { useSession } from '@/store/session';
@@ -107,14 +108,12 @@ export function AuthPage({ mode }: { mode: Mode }) {
         {/* Pitch — hidden on small screens where the form is the whole job. */}
         <aside className="hidden lg:block">
           <Link to="/" className="inline-flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-neon-cyan to-neon-violet font-display text-xl font-bold text-void-950">
-              A
-            </span>
+            <Logo className="size-11" animated />
             <span className="font-display text-lg font-bold tracking-tight">Mini Arcade</span>
           </Link>
 
           <h1 className="mt-10 font-display text-4xl font-bold leading-tight tracking-tight xl:text-5xl">
-            Seven games.
+            Fifteen games.
             <br />
             <span className="neon-text">One rating.</span>
           </h1>
@@ -142,9 +141,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
         <div className="mx-auto w-full max-w-md">
           <div className="surface rounded-3xl p-7 sm:p-8">
             <Link to="/" className="mb-6 inline-flex items-center gap-2 lg:hidden">
-              <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-neon-cyan to-neon-violet font-display font-bold text-void-950">
-                A
-              </span>
+              <Logo className="size-9" />
               <span className="font-display font-bold">Mini Arcade</span>
             </Link>
 

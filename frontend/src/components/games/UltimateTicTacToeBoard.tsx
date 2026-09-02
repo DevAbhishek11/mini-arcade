@@ -80,7 +80,7 @@ export function UltimateTicTacToeBoard({
                 <div className="pointer-events-none absolute inset-0 grid place-items-center rounded-xl bg-void-950/70">
                   <span
                     className={clsx(
-                      'font-display text-5xl font-bold',
+                      'animate-drop-in font-display text-5xl font-bold',
                       result === 'draw' ? 'text-slate-600' : tone(result),
                     )}
                   >
